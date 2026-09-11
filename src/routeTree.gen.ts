@@ -13,8 +13,15 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedCatalogRouteImport } from './routes/_authenticated/catalog'
+import { Route as AuthenticatedClientsRouteImport } from './routes/_authenticated/clients'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedLearningRouteImport } from './routes/_authenticated/learning'
+import { Route as AuthenticatedManufacturersRouteImport } from './routes/_authenticated/manufacturers'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedSourcingRouteImport } from './routes/_authenticated/sourcing'
+import { Route as AuthResetRouteImport } from './routes/auth.reset'
+import { Route as AuthenticatedPortalIndexRouteImport } from './routes/_authenticated/portal.index'
+import { Route as AuthenticatedPortalProjectIdRouteImport } from './routes/_authenticated/portal.$projectId'
 import { Route as AuthenticatedProjectsIndexRouteImport } from './routes/_authenticated/projects.index'
 import { Route as AuthenticatedProjectsProjectIdRouteImport } from './routes/_authenticated/projects_.$projectId'
 
@@ -37,16 +44,54 @@ const AuthenticatedCatalogRoute = AuthenticatedCatalogRouteImport.update({
   path: '/catalog',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedClientsRoute = AuthenticatedClientsRouteImport.update({
+  id: '/clients',
+  path: '/clients',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedLearningRoute = AuthenticatedLearningRouteImport.update({
+  id: '/learning',
+  path: '/learning',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedManufacturersRoute =
+  AuthenticatedManufacturersRouteImport.update({
+    id: '/manufacturers',
+    path: '/manufacturers',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedSourcingRoute = AuthenticatedSourcingRouteImport.update({
+  id: '/sourcing',
+  path: '/sourcing',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthResetRoute = AuthResetRouteImport.update({
+  id: '/reset',
+  path: '/reset',
+  getParentRoute: () => AuthRoute,
+} as any)
+const AuthenticatedPortalIndexRoute =
+  AuthenticatedPortalIndexRouteImport.update({
+    id: '/portal/',
+    path: '/portal/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedPortalProjectIdRoute =
+  AuthenticatedPortalProjectIdRouteImport.update({
+    id: '/portal/$projectId',
+    path: '/portal/$projectId',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedProjectsIndexRoute =
   AuthenticatedProjectsIndexRouteImport.update({
     id: '/projects/',
@@ -62,31 +107,52 @@ const AuthenticatedProjectsProjectIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/auth': typeof AuthRoute
+  '/auth': typeof AuthRouteWithChildren
   '/catalog': typeof AuthenticatedCatalogRoute
+  '/clients': typeof AuthenticatedClientsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/learning': typeof AuthenticatedLearningRoute
+  '/manufacturers': typeof AuthenticatedManufacturersRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/sourcing': typeof AuthenticatedSourcingRoute
+  '/auth/reset': typeof AuthResetRoute
+  '/portal/$projectId': typeof AuthenticatedPortalProjectIdRoute
   '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
+  '/portal/': typeof AuthenticatedPortalIndexRoute
   '/projects/': typeof AuthenticatedProjectsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/auth': typeof AuthRoute
+  '/auth': typeof AuthRouteWithChildren
   '/catalog': typeof AuthenticatedCatalogRoute
+  '/clients': typeof AuthenticatedClientsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/learning': typeof AuthenticatedLearningRoute
+  '/manufacturers': typeof AuthenticatedManufacturersRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/sourcing': typeof AuthenticatedSourcingRoute
+  '/auth/reset': typeof AuthResetRoute
+  '/portal/$projectId': typeof AuthenticatedPortalProjectIdRoute
   '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
+  '/portal': typeof AuthenticatedPortalIndexRoute
   '/projects': typeof AuthenticatedProjectsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
-  '/auth': typeof AuthRoute
+  '/auth': typeof AuthRouteWithChildren
   '/_authenticated/catalog': typeof AuthenticatedCatalogRoute
+  '/_authenticated/clients': typeof AuthenticatedClientsRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/learning': typeof AuthenticatedLearningRoute
+  '/_authenticated/manufacturers': typeof AuthenticatedManufacturersRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/_authenticated/sourcing': typeof AuthenticatedSourcingRoute
+  '/auth/reset': typeof AuthResetRoute
+  '/_authenticated/portal/$projectId': typeof AuthenticatedPortalProjectIdRoute
   '/_authenticated/projects_/$projectId': typeof AuthenticatedProjectsProjectIdRoute
+  '/_authenticated/portal/': typeof AuthenticatedPortalIndexRoute
   '/_authenticated/projects/': typeof AuthenticatedProjectsIndexRoute
 }
 export interface FileRouteTypes {
@@ -95,18 +161,32 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/catalog'
+    | '/clients'
     | '/dashboard'
+    | '/learning'
+    | '/manufacturers'
     | '/settings'
+    | '/sourcing'
+    | '/auth/reset'
+    | '/portal/$projectId'
     | '/projects/$projectId'
+    | '/portal/'
     | '/projects/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/auth'
     | '/catalog'
+    | '/clients'
     | '/dashboard'
+    | '/learning'
+    | '/manufacturers'
     | '/settings'
+    | '/sourcing'
+    | '/auth/reset'
+    | '/portal/$projectId'
     | '/projects/$projectId'
+    | '/portal'
     | '/projects'
   id:
     | '__root__'
@@ -114,16 +194,23 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/auth'
     | '/_authenticated/catalog'
+    | '/_authenticated/clients'
     | '/_authenticated/dashboard'
+    | '/_authenticated/learning'
+    | '/_authenticated/manufacturers'
     | '/_authenticated/settings'
+    | '/_authenticated/sourcing'
+    | '/auth/reset'
+    | '/_authenticated/portal/$projectId'
     | '/_authenticated/projects_/$projectId'
+    | '/_authenticated/portal/'
     | '/_authenticated/projects/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
-  AuthRoute: typeof AuthRoute
+  AuthRoute: typeof AuthRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -156,6 +243,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCatalogRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/clients': {
+      id: '/_authenticated/clients'
+      path: '/clients'
+      fullPath: '/clients'
+      preLoaderRoute: typeof AuthenticatedClientsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -163,11 +257,53 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/learning': {
+      id: '/_authenticated/learning'
+      path: '/learning'
+      fullPath: '/learning'
+      preLoaderRoute: typeof AuthenticatedLearningRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/manufacturers': {
+      id: '/_authenticated/manufacturers'
+      path: '/manufacturers'
+      fullPath: '/manufacturers'
+      preLoaderRoute: typeof AuthenticatedManufacturersRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/settings': {
       id: '/_authenticated/settings'
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/sourcing': {
+      id: '/_authenticated/sourcing'
+      path: '/sourcing'
+      fullPath: '/sourcing'
+      preLoaderRoute: typeof AuthenticatedSourcingRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/auth/reset': {
+      id: '/auth/reset'
+      path: '/reset'
+      fullPath: '/auth/reset'
+      preLoaderRoute: typeof AuthResetRouteImport
+      parentRoute: typeof AuthRoute
+    }
+    '/_authenticated/portal/': {
+      id: '/_authenticated/portal/'
+      path: '/portal'
+      fullPath: '/portal/'
+      preLoaderRoute: typeof AuthenticatedPortalIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/portal/$projectId': {
+      id: '/_authenticated/portal/$projectId'
+      path: '/portal/$projectId'
+      fullPath: '/portal/$projectId'
+      preLoaderRoute: typeof AuthenticatedPortalProjectIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/projects/': {
@@ -189,28 +325,60 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedCatalogRoute: typeof AuthenticatedCatalogRoute
+  AuthenticatedClientsRoute: typeof AuthenticatedClientsRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedLearningRoute: typeof AuthenticatedLearningRoute
+  AuthenticatedManufacturersRoute: typeof AuthenticatedManufacturersRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedSourcingRoute: typeof AuthenticatedSourcingRoute
+  AuthenticatedPortalProjectIdRoute: typeof AuthenticatedPortalProjectIdRoute
   AuthenticatedProjectsProjectIdRoute: typeof AuthenticatedProjectsProjectIdRoute
+  AuthenticatedPortalIndexRoute: typeof AuthenticatedPortalIndexRoute
   AuthenticatedProjectsIndexRoute: typeof AuthenticatedProjectsIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedCatalogRoute: AuthenticatedCatalogRoute,
+  AuthenticatedClientsRoute: AuthenticatedClientsRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedLearningRoute: AuthenticatedLearningRoute,
+  AuthenticatedManufacturersRoute: AuthenticatedManufacturersRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedSourcingRoute: AuthenticatedSourcingRoute,
+  AuthenticatedPortalProjectIdRoute: AuthenticatedPortalProjectIdRoute,
   AuthenticatedProjectsProjectIdRoute: AuthenticatedProjectsProjectIdRoute,
+  AuthenticatedPortalIndexRoute: AuthenticatedPortalIndexRoute,
   AuthenticatedProjectsIndexRoute: AuthenticatedProjectsIndexRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
   AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
 
+interface AuthRouteChildren {
+  AuthResetRoute: typeof AuthResetRoute
+}
+
+const AuthRouteChildren: AuthRouteChildren = {
+  AuthResetRoute: AuthResetRoute,
+}
+
+const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
-  AuthRoute: AuthRoute,
+  AuthRoute: AuthRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

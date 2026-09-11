@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { AuthProvider } from "@/context/AuthContext";
 import {
   Outlet,
   Link,
@@ -35,7 +36,7 @@ function NotFoundComponent() {
   );
 }
 
-function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+function ErrorComponent({ error, reset }: { error: unknown; reset: () => void }) {
   console.error(error);
   const router = useRouter();
   useEffect(() => {
@@ -78,14 +79,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
+      { title: "UZA Build — Drawings to a priced Bill of Quantities" },
+      { name: "description", content: "UZA Build turns drawings into a real, priced Bill of Quantities: AI drafts the takeoff, your Architect, QS, Designer and MEP Engineer approve it." },
       { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { property: "og:title", content: "UZA Build — Drawings to a priced Bill of Quantities" },
+      { property: "og:description", content: "UZA Build turns drawings into a real, priced Bill of Quantities: AI drafts the takeoff, your Architect, QS, Designer and MEP Engineer approve it." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "UZA Build — Drawings to a priced Bill of Quantities" },
+      { name: "twitter:description", content: "UZA Build turns drawings into a real, priced Bill of Quantities: AI drafts the takeoff, your Architect, QS, Designer and MEP Engineer approve it." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/99c97af1-f33f-49ed-963a-53b3dff74d53/id-preview-c26f2ac2--bfd234ab-307c-4cbd-bca9-1ad4111859be.lovable.app-1785685644044.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/99c97af1-f33f-49ed-963a-53b3dff74d53/id-preview-c26f2ac2--bfd234ab-307c-4cbd-bca9-1ad4111859be.lovable.app-1785685644044.png" },
     ],
     links: [
       {
@@ -93,6 +98,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         href: appCss,
       },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "preconnect", href: "https://fonts.googleapis.com" },
+      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap",
+      },
     ],
   }),
   shellComponent: RootShell,
@@ -120,10 +131,11 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
-      <Toaster richColors position="top-right" />
+      <AuthProvider>
+        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+        <Outlet />
+        <Toaster richColors position="top-right" />
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
-

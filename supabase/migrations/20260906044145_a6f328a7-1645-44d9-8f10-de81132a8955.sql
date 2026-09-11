@@ -1,0 +1,16 @@
+REVOKE EXECUTE ON FUNCTION public.is_thread_participant(uuid, uuid) FROM anon, public;
+REVOKE EXECUTE ON FUNCTION public.can_see_thread(uuid, uuid, uuid) FROM anon, public;
+REVOKE EXECUTE ON FUNCTION public.has_role(uuid, public.app_role) FROM anon, public;
+REVOKE EXECUTE ON FUNCTION public.can_access_project(uuid, uuid) FROM anon, public;
+REVOKE EXECUTE ON FUNCTION public.can_see_costs(uuid, uuid) FROM anon, public;
+REVOKE EXECUTE ON FUNCTION public.can_manage_catalog(uuid) FROM anon, public;
+REVOKE EXECUTE ON FUNCTION public.is_client_user(uuid) FROM anon, public;
+REVOKE EXECUTE ON FUNCTION public.is_internal_user(uuid) FROM anon, public;
+GRANT EXECUTE ON FUNCTION public.is_thread_participant(uuid, uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.can_see_thread(uuid, uuid, uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.has_role(uuid, public.app_role) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.can_access_project(uuid, uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.can_see_costs(uuid, uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.can_manage_catalog(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_client_user(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_internal_user(uuid) TO authenticated;

@@ -1,10 +1,10 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Navigate, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { FolderKanban, Package, FileCheck2, Brain } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ROLE_LABELS, SEAT_ROLES, useAuth } from "@/lib/auth";
+import { ROLE_LABELS, SEAT_ROLES, useAuth } from "@/context/AuthContext";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
@@ -21,7 +21,8 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 });
 
 function Dashboard() {
-  const { fullName, roles } = useAuth();
+  const { fullName, roles, isCostBlind } = useAuth();
+  if (isCostBlind) return <Navigate to="/portal" replace />;
 
   const { data: counts } = useQuery({
     queryKey: ["dashboard-counts"],

@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CURRENCIES, money, type Currency } from "@/lib/boq";
-import { useAuth } from "@/lib/auth";
+import { useAuth } from "@/context/AuthContext";
 
 export const Route = createFileRoute("/_authenticated/catalog")({
   head: () => ({
@@ -292,17 +292,17 @@ function NewItemDialog({
         </DialogHeader>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2 sm:col-span-2">
-            <Label>Name</Label>
-            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            <Label htmlFor="ci-name">Name</Label>
+            <Input id="ci-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           </div>
           <div className="space-y-2">
-            <Label>Code</Label>
-            <Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
+            <Label htmlFor="ci-code">Code</Label>
+            <Input id="ci-code" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
           </div>
           <div className="space-y-2">
-            <Label>Category</Label>
+            <Label htmlFor="ci-category">Category</Label>
             <Select value={form.category_id} onValueChange={(v) => setForm({ ...form, category_id: v })}>
-              <SelectTrigger>
+              <SelectTrigger id="ci-category">
                 <SelectValue placeholder="Select" />
               </SelectTrigger>
               <SelectContent>
@@ -315,21 +315,21 @@ function NewItemDialog({
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>Unit</Label>
-            <Input value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} />
+            <Label htmlFor="ci-unit">Unit</Label>
+            <Input id="ci-unit" value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} />
           </div>
           <div className="space-y-2">
-            <Label>Coverage per unit (optional)</Label>
-            <Input value={form.coverage_per_unit} onChange={(e) => setForm({ ...form, coverage_per_unit: e.target.value })} />
+            <Label htmlFor="ci-coverage">Coverage per unit (optional)</Label>
+            <Input id="ci-coverage" value={form.coverage_per_unit} onChange={(e) => setForm({ ...form, coverage_per_unit: e.target.value })} />
           </div>
           <div className="space-y-2">
-            <Label>Price</Label>
-            <Input value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
+            <Label htmlFor="ci-price">Price</Label>
+            <Input id="ci-price" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
           </div>
           <div className="space-y-2">
-            <Label>Currency</Label>
+            <Label htmlFor="ci-currency">Currency</Label>
             <Select value={form.currency} onValueChange={(v) => setForm({ ...form, currency: v as Currency })}>
-              <SelectTrigger>
+              <SelectTrigger id="ci-currency">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -342,9 +342,9 @@ function NewItemDialog({
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>Price source</Label>
+            <Label htmlFor="ci-source">Price source</Label>
             <Select value={form.price_source} onValueChange={(v) => setForm({ ...form, price_source: v })}>
-              <SelectTrigger>
+              <SelectTrigger id="ci-source">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -357,14 +357,15 @@ function NewItemDialog({
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>Default wastage %</Label>
-            <Input value={form.default_wastage_pct} onChange={(e) => setForm({ ...form, default_wastage_pct: e.target.value })} />
+            <Label htmlFor="ci-wastage">Default wastage %</Label>
+            <Input id="ci-wastage" value={form.default_wastage_pct} onChange={(e) => setForm({ ...form, default_wastage_pct: e.target.value })} />
           </div>
           <div className="space-y-2 sm:col-span-2">
-            <Label>Supplier</Label>
-            <Input value={form.supplier} onChange={(e) => setForm({ ...form, supplier: e.target.value })} />
+            <Label htmlFor="ci-supplier">Supplier</Label>
+            <Input id="ci-supplier" value={form.supplier} onChange={(e) => setForm({ ...form, supplier: e.target.value })} />
           </div>
         </div>
+
         <Button
           className="mt-2"
           disabled={!form.name || !form.category_id || create.isPending}

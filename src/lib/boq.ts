@@ -1,22 +1,29 @@
-export type Currency = "RWF" | "USD" | "CNY";
+/**
+ * BOQ display helpers.
+ *
+ * All money maths lives in src/lib/pricing.ts and all business numbers in
+ * src/config/policy.ts. This module only adapts DB values (major-unit numerics)
+ * to those pure functions for display.
+ */
+import { CURRENCY_CODES, type CurrencyCode } from "@/config/policy";
+import { formatMoney, formatQuantity, quantityWithWastage, toMinor } from "@/lib/pricing";
 
-export const CURRENCIES: Currency[] = ["RWF", "USD", "CNY"];
+export type Currency = CurrencyCode;
+
+export const CURRENCIES: Currency[] = [...CURRENCY_CODES];
 
 export function num(value: unknown): number {
   const n = typeof value === "number" ? value : Number(value ?? 0);
   return Number.isFinite(n) ? n : 0;
 }
 
+/** Format a major-unit DB numeric as `RWF 1,234,567`. */
 export function money(value: unknown, currency: Currency = "RWF") {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: currency === "RWF" ? 0 : 2,
-  }).format(num(value));
+  return formatMoney(toMinor(num(value), currency), currency);
 }
 
 export function qty(value: unknown) {
-  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 3 }).format(num(value));
+  return formatQuantity(num(value));
 }
 
 export const MEASUREMENT_METHODS = [
@@ -29,5 +36,5 @@ export const MEASUREMENT_METHODS = [
 
 /** base quantity + wastage = billable quantity */
 export function withWastage(base: number, wastagePct: number) {
-  return base * (1 + wastagePct / 100);
+  return quantityWithWastage(base, wastagePct);
 }

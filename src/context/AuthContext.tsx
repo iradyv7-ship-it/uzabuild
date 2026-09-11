@@ -1,18 +1,17 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
+import {
+  fetchFullName,
+  fetchRoles,
+  getSession,
+  onSessionChange,
+  signOut as signOutRequest,
+} from "@/services/authService";
+import { ROLE_LABELS, SEAT_ROLES, INVITABLE_ROLES, type AppRole } from "@/constants/roles";
 
-export type AppRole = "admin" | "architect" | "qs" | "interior_designer" | "mep_engineer";
-
-export const ROLE_LABELS: Record<AppRole, string> = {
-  admin: "Admin",
-  architect: "Architect",
-  qs: "Quantity Surveyor",
-  interior_designer: "Interior Designer",
-  mep_engineer: "MEP / Structural Engineer",
-};
-
-export const SEAT_ROLES: AppRole[] = ["architect", "qs", "interior_designer", "mep_engineer"];
+// Re-exported so screens can pull the seat vocabulary from one place.
+export { ROLE_LABELS, SEAT_ROLES, INVITABLE_ROLES };
+export type { AppRole };
 
 type AuthValue = {
   user: User | null;
@@ -21,6 +20,8 @@ type AuthValue = {
   fullName: string;
   loading: boolean;
   hasRole: (role: AppRole) => boolean;
+  /** Clients never see cost build-up, margin or the catalog cost base. */
+  isCostBlind: boolean;
   signOut: () => Promise<void>;
 };
 
@@ -33,18 +34,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
+    const unsubscribe = onSessionChange((next) => {
       setSession(next);
       if (!next) {
         setRoles([]);
         setFullName("");
       }
     });
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
+    void getSession().then((current) => {
+      setSession(current);
       setLoading(false);
     });
-    return () => sub.subscription.unsubscribe();
+    return unsubscribe;
   }, []);
 
   const userId = session?.user.id;
@@ -52,13 +53,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!userId) return;
     let cancelled = false;
     void (async () => {
-      const [{ data: roleRows }, { data: profile }] = await Promise.all([
-        supabase.from("user_roles").select("role").eq("user_id", userId),
-        supabase.from("profiles").select("full_name").eq("id", userId).maybeSingle(),
-      ]);
+      const [nextRoles, name] = await Promise.all([fetchRoles(userId), fetchFullName(userId)]);
       if (cancelled) return;
-      setRoles((roleRows ?? []).map((r) => r.role as AppRole));
-      setFullName(profile?.full_name ?? "");
+      setRoles(nextRoles);
+      setFullName(name);
     })();
     return () => {
       cancelled = true;
@@ -72,9 +70,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     fullName,
     loading,
     hasRole: (role) => roles.includes(role),
-    signOut: async () => {
-      await supabase.auth.signOut();
-    },
+    isCostBlind: roles.length > 0 && roles.every((r) => r === "client"),
+    signOut: signOutRequest,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
