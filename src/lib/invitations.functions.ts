@@ -1,16 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import type { AppRole } from "@/constants/roles";
+import { INVITABLE_ROLES, type AppRole } from "@/constants/roles";
 
-const INVITABLE: AppRole[] = [
-  "architect",
-  "interior_designer",
-  "mep_engineer",
-  "qs",
-  "client",
-  "procurement",
-  "project_manager",
-];
+// Was a separately hardcoded list here, drifted from constants/roles.ts and
+// silently rejected any role added to INVITABLE_ROLES without a matching edit
+// in this file (e.g. china_sourcing: offered in the invite dropdown, rejected
+// by this validator). Import the single source of truth instead.
+const INVITABLE: AppRole[] = INVITABLE_ROLES;
 
 export type InviteResult = {
   email: string;
@@ -33,13 +29,17 @@ function normalise(email: string) {
  */
 export const inviteToProject = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { projectId: string; email: string; role: AppRole; redirectTo: string }) => {
-    const email = normalise(data.email ?? "");
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Enter a valid email address.");
-    if (!INVITABLE.includes(data.role)) throw new Error("That role cannot be invited to a project.");
-    if (!data.projectId) throw new Error("Missing project.");
-    return { projectId: data.projectId, email, role: data.role, redirectTo: data.redirectTo };
-  })
+  .inputValidator(
+    (data: { projectId: string; email: string; role: AppRole; redirectTo: string }) => {
+      const email = normalise(data.email ?? "");
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+        throw new Error("Enter a valid email address.");
+      if (!INVITABLE.includes(data.role))
+        throw new Error("That role cannot be invited to a project.");
+      if (!data.projectId) throw new Error("Missing project.");
+      return { projectId: data.projectId, email, role: data.role, redirectTo: data.redirectTo };
+    },
+  )
   .handler(async ({ data, context }): Promise<InviteResult> => {
     const { data: project, error: projectError } = await context.supabase
       .from("projects")
@@ -61,15 +61,17 @@ export const inviteToProject = createServerFn({ method: "POST" })
 
     // Does this person already have an account?
     const { data: existing } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 });
-    let userId = existing?.users.find((u) => (u.email ?? "").toLowerCase() === data.email)?.id ?? null;
+    let userId =
+      existing?.users.find((u) => (u.email ?? "").toLowerCase() === data.email)?.id ?? null;
     let emailed = false;
     let note = "";
 
     if (!userId) {
-      const { data: invited, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
-        data.email,
-        { redirectTo: data.redirectTo, data: { invited_to_project: project.name, role: data.role } },
-      );
+      const { data: invited, error: inviteError } =
+        await supabaseAdmin.auth.admin.inviteUserByEmail(data.email, {
+          redirectTo: data.redirectTo,
+          data: { invited_to_project: project.name, role: data.role },
+        });
       if (inviteError || !invited?.user) {
         note = `We recorded the invitation but could not send the email: ${inviteError?.message ?? "unknown error"}.`;
       } else {
@@ -81,19 +83,19 @@ export const inviteToProject = createServerFn({ method: "POST" })
       note = "This person already has an account, so they were added straight to the project.";
     }
 
-    const { error: rowError } = await context.supabase
-      .from("project_invitations")
-      .upsert(
-        {
-          project_id: data.projectId,
-          email: data.email,
-          role: data.role,
-          invited_by: context.userId,
-          status: userId ? (emailed ? "sent" : "accepted") : "pending",
-          ...(userId && !emailed ? { accepted_by: userId, accepted_at: new Date().toISOString() } : {}),
-        },
-        { onConflict: "project_id,email" },
-      );
+    const { error: rowError } = await context.supabase.from("project_invitations").upsert(
+      {
+        project_id: data.projectId,
+        email: data.email,
+        role: data.role,
+        invited_by: context.userId,
+        status: userId ? (emailed ? "sent" : "accepted") : "pending",
+        ...(userId && !emailed
+          ? { accepted_by: userId, accepted_at: new Date().toISOString() }
+          : {}),
+      },
+      { onConflict: "project_id,email" },
+    );
     if (rowError) throw new Error(rowError.message);
 
     if (userId) {
@@ -108,7 +110,13 @@ export const inviteToProject = createServerFn({ method: "POST" })
         .upsert({ user_id: userId, role: data.role }, { onConflict: "user_id,role" });
     }
 
-    return { email: data.email, role: data.role, emailed, existingAccount: !emailed && !!userId, note };
+    return {
+      email: data.email,
+      role: data.role,
+      emailed,
+      existingAccount: !emailed && !!userId,
+      note,
+    };
   });
 
 /** Re-send the sign-in link to someone who was invited but has not signed in. */
@@ -166,13 +174,23 @@ export const acceptMyInvitations = createServerFn({ method: "POST" })
         .upsert({ user_id: context.userId, role: inv.role }, { onConflict: "user_id,role" });
       await supabaseAdmin
         .from("project_invitations")
-        .update({ status: "accepted", accepted_by: context.userId, accepted_at: new Date().toISOString() })
+        .update({
+          status: "accepted",
+          accepted_by: context.userId,
+          accepted_at: new Date().toISOString(),
+        })
         .eq("id", inv.id);
     }
 
-    const { data: roles } = await supabaseAdmin.from("user_roles").select("role").eq("user_id", context.userId);
+    const { data: roles } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", context.userId);
     const list = (roles ?? []).map((r) => r.role);
-    return { accepted: pending?.length ?? 0, isClient: list.length > 0 && list.every((r) => r === "client") };
+    return {
+      accepted: pending?.length ?? 0,
+      isClient: list.length > 0 && list.every((r) => r === "client"),
+    };
   });
 
 /** Withdraw an invitation and remove that person's access to this project. */
