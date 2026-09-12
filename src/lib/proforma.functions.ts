@@ -1,6 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+const ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/messages";
+const ANTHROPIC_VERSION = "2023-06-01";
+/** Opus 5. Short, schema-forced extraction — no extended thinking needed. */
+const MODEL = "claude-opus-5";
+const MAX_TOKENS = 8192;
+
 export type ParsedQuoteLine = {
   description: string;
   original_description: string;
@@ -54,54 +60,50 @@ function normaliseUnit(unit: string): string {
   return UNIT_TRANSLATIONS[trimmed] ?? trimmed;
 }
 
-
 const TOOL = {
-  type: "function",
-  function: {
-    name: "record_quote_lines",
-    description: "Record every priced line found in a factory quotation.",
-    parameters: {
-      type: "object",
-      properties: {
-        lines: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              description: {
-                type: "string",
-                description: "Item description translated into English",
-              },
-              original_description: {
-                type: "string",
-                description: "The description exactly as written by the factory",
-              },
-              specification: {
-                type: "string",
-                description: "Size, finish, material, model code. Empty string if absent.",
-              },
-              unit: { type: "string", description: "pcs, m2, set, etc. Empty string if absent." },
-              quantity: { type: "number" },
-              unit_price_rmb: {
-                type: "number",
-                description: "Unit price in RMB. 0 if not stated.",
-              },
+  name: "record_quote_lines",
+  description: "Record every priced line found in a factory quotation.",
+  input_schema: {
+    type: "object",
+    properties: {
+      lines: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            description: {
+              type: "string",
+              description: "Item description translated into English",
             },
-            required: [
-              "description",
-              "original_description",
-              "specification",
-              "unit",
-              "quantity",
-              "unit_price_rmb",
-            ],
-            additionalProperties: false,
+            original_description: {
+              type: "string",
+              description: "The description exactly as written by the factory",
+            },
+            specification: {
+              type: "string",
+              description: "Size, finish, material, model code. Empty string if absent.",
+            },
+            unit: { type: "string", description: "pcs, m2, set, etc. Empty string if absent." },
+            quantity: { type: "number" },
+            unit_price_rmb: {
+              type: "number",
+              description: "Unit price in RMB. 0 if not stated.",
+            },
           },
+          required: [
+            "description",
+            "original_description",
+            "specification",
+            "unit",
+            "quantity",
+            "unit_price_rmb",
+          ],
+          additionalProperties: false,
         },
       },
-      required: ["lines"],
-      additionalProperties: false,
     },
+    required: ["lines"],
+    additionalProperties: false,
   },
 } as const;
 
@@ -115,28 +117,27 @@ export const parseFactoryQuote = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(validate)
   .handler(async ({ data }) => {
-    const apiKey = process.env["LOVABLE_API_KEY"];
+    const apiKey = process.env["ANTHROPIC_API_KEY"];
     if (!apiKey) throw new Error("Quote reading is not configured.");
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch(ANTHROPIC_MESSAGES_URL, {
       method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": ANTHROPIC_VERSION,
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
-        model: "openai/gpt-5.6-sol",
-        reasoning_effort: "none",
-        messages: [
-          {
-            role: "system",
-            content:
-              "You extract priced lines from Chinese or English factory quotations for construction finishing materials, " +
-              "furniture, joinery, doors and stone. Translate descriptions into formal English. Preserve numbers, units, " +
-              "dimensions, finishes and model codes exactly. Never invent a price or a quantity: use 0 when it is not stated. " +
-              "Ignore totals, taxes, bank details and commentary rows.",
-          },
-          { role: "user", content: data.text },
-        ],
+        model: MODEL,
+        max_tokens: MAX_TOKENS,
+        system:
+          "You extract priced lines from Chinese or English factory quotations for construction finishing materials, " +
+          "furniture, joinery, doors and stone. Translate descriptions into formal English. Preserve numbers, units, " +
+          "dimensions, finishes and model codes exactly. Never invent a price or a quantity: use 0 when it is not stated. " +
+          "Ignore totals, taxes, bank details and commentary rows.",
+        messages: [{ role: "user", content: data.text }],
         tools: [TOOL],
-        tool_choice: { type: "function", function: { name: "record_quote_lines" } },
+        tool_choice: { type: "tool", name: "record_quote_lines" },
       }),
     });
 
@@ -146,12 +147,12 @@ export const parseFactoryQuote = createServerFn({ method: "POST" })
     if (!response.ok) throw new Error("Could not read that quotation.");
 
     const json = (await response.json()) as {
-      choices?: { message?: { tool_calls?: { function?: { arguments?: string } }[] } }[];
+      content?: { type: string; input?: { lines?: ParsedQuoteLine[] } }[];
     };
-    const args = json.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
-    if (!args) throw new Error("No priced lines were found in that quotation.");
+    const toolUse = json.content?.find((block) => block.type === "tool_use");
+    if (!toolUse?.input) throw new Error("No priced lines were found in that quotation.");
 
-    const parsed = JSON.parse(args) as { lines?: ParsedQuoteLine[] };
+    const parsed = toolUse.input;
     const lines = (parsed.lines ?? []).filter(
       (l) => typeof l.description === "string" && l.description.trim() !== "",
     );

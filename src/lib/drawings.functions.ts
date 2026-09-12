@@ -5,6 +5,12 @@ import { readAnyDrawing } from "@/lib/drawing-reader.server";
 /** 18 MB of source file — beyond this the model call is not reliable. */
 const MAX_BYTES = 18 * 1024 * 1024;
 
+const ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/messages";
+const ANTHROPIC_VERSION = "2023-06-01";
+/** Opus 5. Short, schema-forced extraction — no extended thinking needed. */
+const MODEL = "claude-opus-5";
+const MAX_TOKENS = 8192;
+
 function validate(input: unknown): { drawingId: string } {
   const value = input as Partial<{ drawingId: string }>;
   if (!value || typeof value.drawingId !== "string" || value.drawingId.length === 0) {
@@ -14,79 +20,76 @@ function validate(input: unknown): { drawingId: string } {
 }
 
 const TOOL = {
-  type: "function",
-  function: {
-    name: "record_takeoff",
-    description: "Record every measurable space and opening visible on this drawing.",
-    parameters: {
-      type: "object",
-      properties: {
-        scale_note: {
-          type: "string",
-          description:
-            "The drawing scale or dimension basis you used, quoted from the drawing. Empty string if none is printed.",
-        },
-        spaces: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              name: {
-                type: "string",
-                description: "Room or space name as labelled on the drawing",
-              },
-              level: {
-                type: "string",
-                description: "Floor or level label. Empty string if not shown.",
-              },
-              floor_area_m2: {
-                type: "number",
-                description: "Floor area in square metres. 0 if not derivable.",
-              },
-              wall_area_m2: {
-                type: "number",
-                description: "Net wall area in square metres. 0 if not derivable.",
-              },
-              perimeter_m: {
-                type: "number",
-                description: "Perimeter in metres. 0 if not derivable.",
-              },
-              door_count: { type: "number" },
-              window_count: { type: "number" },
-              opening_area_m2: {
-                type: "number",
-                description:
-                  "Combined door and window area deducted from the walls. 0 if not derivable.",
-              },
-              confidence: {
-                type: "number",
-                description: "0 to 1. How sure you are of these figures.",
-              },
-              basis: {
-                type: "string",
-                description:
-                  "The dimensions or scale you read off the drawing to arrive at these figures.",
-              },
+  name: "record_takeoff",
+  description: "Record every measurable space and opening visible on this drawing.",
+  input_schema: {
+    type: "object",
+    properties: {
+      scale_note: {
+        type: "string",
+        description:
+          "The drawing scale or dimension basis you used, quoted from the drawing. Empty string if none is printed.",
+      },
+      spaces: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            name: {
+              type: "string",
+              description: "Room or space name as labelled on the drawing",
             },
-            required: [
-              "name",
-              "level",
-              "floor_area_m2",
-              "wall_area_m2",
-              "perimeter_m",
-              "door_count",
-              "window_count",
-              "opening_area_m2",
-              "confidence",
-              "basis",
-            ],
-            additionalProperties: false,
+            level: {
+              type: "string",
+              description: "Floor or level label. Empty string if not shown.",
+            },
+            floor_area_m2: {
+              type: "number",
+              description: "Floor area in square metres. 0 if not derivable.",
+            },
+            wall_area_m2: {
+              type: "number",
+              description: "Net wall area in square metres. 0 if not derivable.",
+            },
+            perimeter_m: {
+              type: "number",
+              description: "Perimeter in metres. 0 if not derivable.",
+            },
+            door_count: { type: "number" },
+            window_count: { type: "number" },
+            opening_area_m2: {
+              type: "number",
+              description:
+                "Combined door and window area deducted from the walls. 0 if not derivable.",
+            },
+            confidence: {
+              type: "number",
+              description: "0 to 1. How sure you are of these figures.",
+            },
+            basis: {
+              type: "string",
+              description:
+                "The dimensions or scale you read off the drawing to arrive at these figures.",
+            },
           },
+          required: [
+            "name",
+            "level",
+            "floor_area_m2",
+            "wall_area_m2",
+            "perimeter_m",
+            "door_count",
+            "window_count",
+            "opening_area_m2",
+            "confidence",
+            "basis",
+          ],
+          additionalProperties: false,
         },
       },
-      required: ["scale_note", "spaces"],
-      additionalProperties: false,
     },
+    required: ["scale_note", "spaces"],
+    additionalProperties: false,
   },
 } as const;
 
@@ -122,7 +125,7 @@ export const readDrawing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(validate)
   .handler(async ({ data, context }) => {
-    const apiKey = process.env["LOVABLE_API_KEY"];
+    const apiKey = process.env["ANTHROPIC_API_KEY"];
     if (!apiKey) throw new Error("Drawing reading is not configured.");
 
     const { data: drawing, error } = await context.supabase
@@ -176,13 +179,43 @@ export const readDrawing = createServerFn({ method: "POST" })
     // proprietary CAD/BIM binaries (DWG, RVT, RFA, SKP, NWD) get their layer,
     // room and schedule labels salvaged rather than being rejected outright.
     // Either way the model sees SOMETHING and every draft still needs a QS.
-    const source = readAnyDrawing({ bytes, fileName: drawing.file_name, mimeType: drawing.file_type });
+    const source = readAnyDrawing({
+      bytes,
+      fileName: drawing.file_name,
+      mimeType: drawing.file_type,
+    });
     if (source.mode === "text" && !source.text?.trim()) {
       return fail(
         "Nothing readable could be recovered from this file.",
         "The universal drawing reader found no recoverable layers, labels or text in this file — a surveyor must measure it.",
       );
     }
+
+    // Anthropic splits "file" input by media type: real images are an `image` block,
+    // but a native PDF is a `document` block — the same distinction the reader's own
+    // `source.mimeType` already carries, it just wasn't visible under a single
+    // OpenAI-style `image_url` part.
+    const filePart =
+      source.mode === "file"
+        ? source.mimeType === "application/pdf"
+          ? {
+              type: "document" as const,
+              source: {
+                type: "base64" as const,
+                media_type: "application/pdf" as const,
+                data: toBase64(source.bytes!),
+              },
+            }
+          : {
+              type: "image" as const,
+              source: {
+                type: "base64" as const,
+                media_type: source.mimeType as
+                  "image/jpeg" | "image/png" | "image/gif" | "image/webp",
+                data: toBase64(source.bytes!),
+              },
+            }
+        : null;
 
     const userContent =
       source.mode === "file"
@@ -191,10 +224,7 @@ export const readDrawing = createServerFn({ method: "POST" })
               type: "text" as const,
               text: `Drawing file: ${drawing.file_name}. Record every labelled space and its openings.`,
             },
-            {
-              type: "image_url" as const,
-              image_url: { url: `data:${source.mimeType};base64,${toBase64(source.bytes!)}` },
-            },
+            filePart!,
           ]
         : [
             {
@@ -207,28 +237,29 @@ export const readDrawing = createServerFn({ method: "POST" })
             },
           ];
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch(ANTHROPIC_MESSAGES_URL, {
       method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": ANTHROPIC_VERSION,
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
-        model: "openai/gpt-5.6-sol",
-        reasoning_effort: "none",
+        model: MODEL,
+        max_tokens: MAX_TOKENS,
+        system:
+          "You are a quantity surveyor reading an architectural drawing. Work only from what is printed: room labels, " +
+          "dimension strings, door and window schedules and the stated scale. Derive floor area, net wall area, " +
+          "perimeter and opening areas in metric units. If a figure cannot be derived from the drawing, return 0 " +
+          "rather than estimating it, and lower your confidence. Never invent a room that is not labelled.",
         messages: [
-          {
-            role: "system",
-            content:
-              "You are a quantity surveyor reading an architectural drawing. Work only from what is printed: room labels, " +
-              "dimension strings, door and window schedules and the stated scale. Derive floor area, net wall area, " +
-              "perimeter and opening areas in metric units. If a figure cannot be derived from the drawing, return 0 " +
-              "rather than estimating it, and lower your confidence. Never invent a room that is not labelled.",
-          },
           {
             role: "user",
             content: userContent,
           },
         ],
         tools: [TOOL],
-        tool_choice: { type: "function", function: { name: "record_takeoff" } },
+        tool_choice: { type: "tool", name: "record_takeoff" },
       }),
     });
 
@@ -243,17 +274,17 @@ export const readDrawing = createServerFn({ method: "POST" })
     }
 
     const json = (await response.json()) as {
-      choices?: { message?: { tool_calls?: { function?: { arguments?: string } }[] } }[];
+      content?: { type: string; input?: { scale_note?: string; spaces?: Space[] } }[];
     };
-    const args = json.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
-    if (!args) {
+    const toolUse = json.content?.find((block) => block.type === "tool_use");
+    if (!toolUse?.input) {
       return fail(
         "Nothing measurable was found on this drawing.",
         "No labelled, dimensioned spaces were found — a surveyor must measure this drawing.",
       );
     }
 
-    const parsed = JSON.parse(args) as { scale_note?: string; spaces?: Space[] };
+    const parsed = toolUse.input;
     const spaces = (parsed.spaces ?? []).filter(
       (s) => typeof s.name === "string" && s.name.trim() !== "",
     );
@@ -367,5 +398,12 @@ export const readDrawing = createServerFn({ method: "POST" })
       })
       .eq("id", drawing.id);
 
-    return { spaces: spaces.length, lines: rows.length, scaleNote, needsHuman, method: source.method, degraded: source.degraded };
+    return {
+      spaces: spaces.length,
+      lines: rows.length,
+      scaleNote,
+      needsHuman,
+      method: source.method,
+      degraded: source.degraded,
+    };
   });
