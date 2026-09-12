@@ -39,6 +39,7 @@ import { stageLabel } from "@/components/project/StageMachine";
 import { boqItemNo, statusLabel, statusVariant } from "@/lib/project-status";
 import { StageApprovals } from "@/components/project/StageApprovals";
 import { DocumentsPanel } from "@/components/project/DocumentsPanel";
+import { RenderingPanel } from "@/components/project/RenderingPanel";
 import { TakeoffPanel } from "@/components/project/TakeoffPanel";
 import { SolarPanel } from "@/components/project/SolarPanel";
 import { ProposalPanel } from "@/components/project/ProposalPanel";
@@ -444,6 +445,7 @@ function ProjectBoq() {
           {!isCostBlind && <TabsTrigger value="discovery">Client brief</TabsTrigger>}
           {!isCostBlind && <TabsTrigger value="coordination">Discussions</TabsTrigger>}
           {!isCostBlind && <TabsTrigger value="documents">Drawings</TabsTrigger>}
+          {!isCostBlind && <TabsTrigger value="rendering">3D rendering</TabsTrigger>}
           {!isCostBlind && <TabsTrigger value="takeoff">Takeoff</TabsTrigger>}
           {!isCostBlind && <TabsTrigger value="boq">BOQ</TabsTrigger>}
           {!isCostBlind && <TabsTrigger value="packages">Packages</TabsTrigger>}
@@ -479,6 +481,12 @@ function ProjectBoq() {
         {!isCostBlind && (
           <TabsContent value="documents">
             <DocumentsPanel projectId={projectId} />
+          </TabsContent>
+        )}
+
+        {!isCostBlind && (
+          <TabsContent value="rendering">
+            <RenderingPanel projectId={projectId} />
           </TabsContent>
         )}
 
