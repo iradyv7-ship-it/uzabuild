@@ -12,7 +12,8 @@ export type AppRole =
   | "mep_engineer"
   | "client"
   | "procurement"
-  | "project_manager";
+  | "project_manager"
+  | "china_sourcing";
 
 export const ROLE_LABELS: Record<AppRole, string> = {
   admin: "Admin",
@@ -23,6 +24,11 @@ export const ROLE_LABELS: Record<AppRole, string> = {
   client: "Client",
   procurement: "Procurement",
   project_manager: "Project Manager",
+  // Deliberately the same string as UZA Nexus OS's `china_sourcing` role
+  // (packages/contracts/src/permissions.ts) — same job, same name across the
+  // UZA estate. The two systems are separate apps with separate databases;
+  // this is a naming convention only, not an integration.
+  china_sourcing: "China Sourcing",
 };
 
 /** Roles that sign off on a BOQ version, in sequence. */
@@ -43,6 +49,10 @@ export const INVITABLE_ROLES: AppRole[] = [
   "procurement",
   "project_manager",
   "client",
+  // Sourcing/procurement coordination with Chinese manufacturers — deliberately
+  // NOT a SEAT_ROLES member (that list is the BOQ sign-off chain), same as
+  // `procurement` above.
+  "china_sourcing",
 ];
 
 export function roleLabel(role: string): string {
