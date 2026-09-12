@@ -677,6 +677,72 @@ export type Database = {
           },
         ]
       }
+      drawing_speckle_models: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          drawing_id: string
+          embed_url: string | null
+          id: string
+          ingestion_error: string | null
+          ingestion_status: string
+          latest_file_id: string | null
+          latest_ingestion_id: string | null
+          latest_version_id: string | null
+          project_id: string
+          speckle_model_id: string
+          speckle_model_name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          drawing_id: string
+          embed_url?: string | null
+          id?: string
+          ingestion_error?: string | null
+          ingestion_status?: string
+          latest_file_id?: string | null
+          latest_ingestion_id?: string | null
+          latest_version_id?: string | null
+          project_id: string
+          speckle_model_id: string
+          speckle_model_name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          drawing_id?: string
+          embed_url?: string | null
+          id?: string
+          ingestion_error?: string | null
+          ingestion_status?: string
+          latest_file_id?: string | null
+          latest_ingestion_id?: string | null
+          latest_version_id?: string | null
+          project_id?: string
+          speckle_model_id?: string
+          speckle_model_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drawing_speckle_models_drawing_id_fkey"
+            columns: ["drawing_id"]
+            isOneToOne: true
+            referencedRelation: "drawings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drawing_speckle_models_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       drawings: {
         Row: {
           created_at: string
@@ -1644,6 +1710,44 @@ export type Database = {
             foreignKeyName: "project_members_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_speckle_projects: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          project_id: string
+          speckle_project_id: string
+          speckle_server_url: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          project_id: string
+          speckle_project_id: string
+          speckle_server_url?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          project_id?: string
+          speckle_project_id?: string
+          speckle_server_url?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_speckle_projects_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
             referencedRelation: "projects"
             referencedColumns: ["id"]
           },
