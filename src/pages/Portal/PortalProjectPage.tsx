@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { QueryState, EmptyState } from "@/components/DataState";
 import { StageTimeline } from "@/components/portal/StageTimeline";
 import { ProformaViewerDialog } from "@/components/portal/ProformaViewerDialog";
+import { RenderingPanel } from "@/components/project/RenderingPanel";
 import {
   getPortalProject,
   listProjectApprovals,
@@ -80,6 +81,11 @@ export function PortalProjectPage({ projectId }: { projectId: string }) {
             />
           </CardContent>
         </Card>
+
+        <div>
+          <h2 className="mb-3 font-display text-lg font-semibold tracking-tight">Your rendering</h2>
+          <RenderingPanel projectId={projectId} canManage={false} />
+        </div>
 
         <Card>
           <CardHeader>
