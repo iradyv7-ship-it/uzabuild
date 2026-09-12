@@ -2844,6 +2844,7 @@ export type Database = {
         | "client"
         | "procurement"
         | "project_manager"
+        | "china_sourcing"
       currency_code: "RWF" | "USD" | "CNY"
       extraction_status:
         | "pending"
@@ -2988,6 +2989,7 @@ export const Constants = {
         "client",
         "procurement",
         "project_manager",
+        "china_sourcing",
       ],
       currency_code: ["RWF", "USD", "CNY"],
       extraction_status: [
