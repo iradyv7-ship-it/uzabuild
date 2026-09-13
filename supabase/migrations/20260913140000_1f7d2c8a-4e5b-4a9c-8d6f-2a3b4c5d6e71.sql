@@ -1,0 +1,12 @@
+-- Add the external Manufacturer role to app_role -- a Chinese factory
+-- invited directly into the system (by china_sourcing or admin only, see
+-- src/lib/invitations.functions.ts's inviteManufacturer), walled to the
+-- specific package/RFQ it was invited to. The actual wall (tables + RLS) is
+-- built in the next migration.
+--
+-- Kept in its own migration file, doing nothing else: Postgres will not let
+-- a newly added enum value be used (cast, compared, inserted) inside the
+-- same transaction that adds it, and this repo's migrations each run as one
+-- transaction. Same pattern as 'client'/'procurement'/'project_manager'
+-- (20260902110253) and 'china_sourcing' (20260912120000).
+ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'manufacturer';

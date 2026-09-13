@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Download, FileUp, Paperclip, Trash2, Factory, AlertTriangle } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import { Download, FileUp, Paperclip, Trash2, Factory, AlertTriangle, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +9,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -17,6 +26,7 @@ import {
 } from "@/components/ui/select";
 import { EmptyState } from "@/components/DataState";
 import { useAuth } from "@/context/AuthContext";
+import { inviteManufacturer } from "@/lib/invitations.functions";
 import {
   ATTACHMENT_KINDS,
   MANUFACTURER_STATUSES,
@@ -81,9 +91,13 @@ export function PackageDetail({
   coverage: SupplierCoverage[];
 }) {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { user, hasRole } = useAuth();
+  const canInviteManufacturer = hasRole("china_sourcing") || hasRole("admin");
+  const doInviteManufacturer = useServerFn(inviteManufacturer);
   const fileInput = useRef<HTMLInputElement>(null);
   const [uploadTarget, setUploadTarget] = useState<{ key: string | null; kind: string } | null>(null);
+  const [inviteTarget, setInviteTarget] = useState<{ supplierId: string; name: string } | null>(null);
+  const [inviteEmail, setInviteEmail] = useState("");
   const [design, setDesign] = useState<Record<string, string>>({});
   const currency = pkg.budget_currency as "RWF" | "USD" | "CNY";
   const [budget, setBudget] = useState<string>(
@@ -136,6 +150,22 @@ export function PackageDetail({
     onSuccess: () => {
       toast.success("Manufacturer shortlisted.");
       invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const inviteManufacturerLogin = useMutation({
+    mutationFn: () => {
+      if (!inviteTarget) throw new Error("No manufacturer selected.");
+      const redirectTo = typeof window === "undefined" ? "" : `${window.location.origin}/auth/reset`;
+      return doInviteManufacturer({
+        data: { packageId: pkg.id, supplierId: inviteTarget.supplierId, email: inviteEmail, redirectTo },
+      });
+    },
+    onSuccess: (result) => {
+      toast.success(`${result.email} invited, walled to this package only. ${result.note}`);
+      setInviteTarget(null);
+      setInviteEmail("");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -546,6 +576,17 @@ export function PackageDetail({
                             ))}
                           </SelectContent>
                         </Select>
+                        {canInviteManufacturer && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              setInviteTarget({ supplierId: m.supplier_id, name: c?.suppliers?.name ?? "this manufacturer" })
+                            }
+                          >
+                            <UserPlus className="size-4" aria-hidden /> Invite to log in
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"
@@ -590,6 +631,37 @@ export function PackageDetail({
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={inviteTarget !== null} onOpenChange={(open) => !open && setInviteTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Invite {inviteTarget?.name} to log in</DialogTitle>
+            <DialogDescription>
+              Walled to this package only: they will be able to see this package's brief and RFQ
+              documents and upload their own quote/drawings/specs against it — never the client&apos;s
+              identity, the USD price, another manufacturer&apos;s data, or any other project.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label htmlFor="mfr-email">Their contact email</Label>
+            <Input
+              id="mfr-email"
+              type="email"
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+              placeholder="contact@factory.com"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              disabled={inviteManufacturerLogin.isPending || !inviteEmail.trim()}
+              onClick={() => inviteManufacturerLogin.mutate()}
+            >
+              {inviteManufacturerLogin.isPending ? "Sending…" : "Send invitation"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

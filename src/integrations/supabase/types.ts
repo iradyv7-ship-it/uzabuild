@@ -677,6 +677,45 @@ export type Database = {
           },
         ]
       }
+      document_acknowledgements: {
+        Row: {
+          acknowledged_at: string
+          drawing_id: string
+          id: string
+          project_id: string
+          user_id: string
+        }
+        Insert: {
+          acknowledged_at?: string
+          drawing_id: string
+          id?: string
+          project_id: string
+          user_id: string
+        }
+        Update: {
+          acknowledged_at?: string
+          drawing_id?: string
+          id?: string
+          project_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_acknowledgements_drawing_id_fkey"
+            columns: ["drawing_id"]
+            isOneToOne: false
+            referencedRelation: "drawings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_acknowledgements_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       drawing_speckle_models: {
         Row: {
           created_at: string
@@ -745,6 +784,9 @@ export type Database = {
       }
       drawings: {
         Row: {
+          client_visible: boolean
+          client_visible_at: string | null
+          client_visible_by: string | null
           created_at: string
           degraded: boolean
           document_kind: string
@@ -764,6 +806,9 @@ export type Database = {
           uploaded_by: string | null
         }
         Insert: {
+          client_visible?: boolean
+          client_visible_at?: string | null
+          client_visible_by?: string | null
           created_at?: string
           degraded?: boolean
           document_kind?: string
@@ -783,6 +828,9 @@ export type Database = {
           uploaded_by?: string | null
         }
         Update: {
+          client_visible?: boolean
+          client_visible_at?: string | null
+          client_visible_by?: string | null
           created_at?: string
           degraded?: boolean
           document_kind?: string
@@ -981,6 +1029,38 @@ export type Database = {
           },
         ]
       }
+      manufacturer_users: {
+        Row: {
+          created_at: string
+          id: string
+          invited_by: string | null
+          supplier_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          invited_by?: string | null
+          supplier_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          invited_by?: string | null
+          supplier_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "manufacturer_users_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       package_attachments: {
         Row: {
           caption: string | null
@@ -995,6 +1075,7 @@ export type Database = {
           size_bytes: number | null
           storage_path: string
           uploaded_by: string | null
+          uploaded_for_supplier_id: string | null
         }
         Insert: {
           caption?: string | null
@@ -1009,6 +1090,7 @@ export type Database = {
           size_bytes?: number | null
           storage_path: string
           uploaded_by?: string | null
+          uploaded_for_supplier_id?: string | null
         }
         Update: {
           caption?: string | null
@@ -1023,6 +1105,7 @@ export type Database = {
           size_bytes?: number | null
           storage_path?: string
           uploaded_by?: string | null
+          uploaded_for_supplier_id?: string | null
         }
         Relationships: [
           {
@@ -1037,6 +1120,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "package_attachments_uploaded_for_supplier_id_fkey"
+            columns: ["uploaded_for_supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
             referencedColumns: ["id"]
           },
         ]
@@ -2156,6 +2246,33 @@ export type Database = {
           },
         ]
       }
+      role_bootstrap_emails: {
+        Row: {
+          created_at: string
+          email: string
+          full_name: string | null
+          id: string
+          note: string | null
+          role: Database["public"]["Enums"]["app_role"]
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          full_name?: string | null
+          id?: string
+          note?: string | null
+          role: Database["public"]["Enums"]["app_role"]
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          full_name?: string | null
+          id?: string
+          note?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+        }
+        Relationships: []
+      }
       rfq_lines: {
         Row: {
           created_at: string
@@ -2949,6 +3066,7 @@ export type Database = {
         | "procurement"
         | "project_manager"
         | "china_sourcing"
+        | "manufacturer"
       currency_code: "RWF" | "USD" | "CNY"
       extraction_status:
         | "pending"
@@ -3094,6 +3212,7 @@ export const Constants = {
         "procurement",
         "project_manager",
         "china_sourcing",
+        "manufacturer",
       ],
       currency_code: ["RWF", "USD", "CNY"],
       extraction_status: [

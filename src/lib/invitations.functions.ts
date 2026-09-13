@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { INVITABLE_ROLES, type AppRole } from "@/constants/roles";
+import { INVITABLE_ROLES, MANUFACTURER_INVITER_ROLES, type AppRole } from "@/constants/roles";
 
 // Was a separately hardcoded list here, drifted from constants/roles.ts and
 // silently rejected any role added to INVITABLE_ROLES without a matching edit
@@ -190,6 +190,132 @@ export const acceptMyInvitations = createServerFn({ method: "POST" })
     return {
       accepted: pending?.length ?? 0,
       isClient: list.length > 0 && list.every((r) => r === "client"),
+    };
+  });
+
+export type InviteManufacturerResult = {
+  email: string;
+  emailed: boolean;
+  existingAccount: boolean;
+  note: string;
+};
+
+/**
+ * Invite a Chinese manufacturer directly into the system — walled to ONE
+ * package/RFQ, never a general project-wide seat. Deliberately a sibling
+ * function rather than reusing `inviteToProject`: that path grants a
+ * project-wide `project_members` row (the same reach as an architect or QS),
+ * which is exactly what a manufacturer must never get (see
+ * src/lib/manufacturer-access.ts and the RLS in
+ * 20260913140500_...manufacturer wall). Only `china_sourcing` or `admin` may
+ * call this — a project owner who is neither cannot invite a manufacturer at
+ * all, even to their own project (MANUFACTURER_INVITER_ROLES).
+ */
+export const inviteManufacturer = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (data: { packageId: string; supplierId: string; email: string; redirectTo: string }) => {
+      const email = normalise(data.email ?? "");
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+        throw new Error("Enter a valid email address.");
+      if (!data.packageId) throw new Error("Missing package.");
+      if (!data.supplierId) throw new Error("Missing manufacturer.");
+      return {
+        packageId: data.packageId,
+        supplierId: data.supplierId,
+        email,
+        redirectTo: data.redirectTo,
+      };
+    },
+  )
+  .handler(async ({ data, context }): Promise<InviteManufacturerResult> => {
+    const { data: roleRows, error: roleError } = await context.supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", context.userId);
+    if (roleError) throw new Error(roleError.message);
+    const callerRoles: string[] = (roleRows ?? []).map((r) => r.role);
+    const allowed = (MANUFACTURER_INVITER_ROLES as string[]).some((r) => callerRoles.includes(r));
+    if (!allowed) throw new Error("Only China Sourcing or an admin may invite a manufacturer.");
+
+    const { data: pkg, error: pkgError } = await context.supabase
+      .from("product_packages")
+      .select("id, project_id, title")
+      .eq("id", data.packageId)
+      .maybeSingle();
+    if (pkgError) throw new Error(pkgError.message);
+    if (!pkg) throw new Error("Package not found, or you cannot access it.");
+
+    const { data: supplier, error: supplierError } = await context.supabase
+      .from("suppliers")
+      .select("id, name")
+      .eq("id", data.supplierId)
+      .maybeSingle();
+    if (supplierError) throw new Error(supplierError.message);
+    if (!supplier) throw new Error("Manufacturer not found.");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // This upsert IS the scope grant: a manufacturer's whole reach is
+    // "supplier_id has a package_manufacturers row for this package_id"
+    // (see is_invited_manufacturer() in the wall migration).
+    const { error: shortlistError } = await supabaseAdmin.from("package_manufacturers").upsert(
+      {
+        package_id: data.packageId,
+        project_id: pkg.project_id,
+        supplier_id: data.supplierId,
+        status: "rfq_sent",
+        created_by: context.userId,
+      },
+      { onConflict: "package_id,supplier_id" },
+    );
+    if (shortlistError) throw new Error(shortlistError.message);
+
+    const { data: existing } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 });
+    let userId =
+      existing?.users.find((u) => (u.email ?? "").toLowerCase() === data.email)?.id ?? null;
+    let emailed = false;
+    let note = "";
+
+    if (!userId) {
+      const { data: invited, error: inviteError } =
+        await supabaseAdmin.auth.admin.inviteUserByEmail(data.email, {
+          redirectTo: data.redirectTo,
+          data: { role: "manufacturer", invited_to_package: pkg.title },
+        });
+      if (inviteError || !invited?.user) {
+        note = `We recorded the invitation but could not send the email: ${inviteError?.message ?? "unknown error"}.`;
+      } else {
+        userId = invited.user.id;
+        emailed = true;
+        note = "An invitation email with a sign-in link has been sent.";
+      }
+    } else {
+      note = "This person already has an account, so it was linked to this manufacturer directly.";
+    }
+
+    if (userId) {
+      // Deliberately NOT a project_members row — that would grant
+      // can_access_project(), the same reach as a real project seat. Scope
+      // comes only from manufacturer_users + the package_manufacturers row
+      // above.
+      const { error: linkError } = await supabaseAdmin
+        .from("manufacturer_users")
+        .upsert(
+          { user_id: userId, supplier_id: data.supplierId, invited_by: context.userId },
+          { onConflict: "user_id" },
+        );
+      if (linkError) throw new Error(linkError.message);
+      await supabaseAdmin
+        .from("user_roles")
+        .upsert({ user_id: userId, role: "manufacturer" }, { onConflict: "user_id,role" });
+    }
+
+    return {
+      email: data.email,
+      emailed,
+      existingAccount: !emailed && !!userId,
+      note,
     };
   });
 
