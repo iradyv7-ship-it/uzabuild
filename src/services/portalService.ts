@@ -88,6 +88,31 @@ export async function listProformaLines(proformaId: string) {
   return data ?? [];
 }
 
+/**
+ * Documents released to the client (task 7): the RLS on `drawings`
+ * (20260913150000) only ever returns a row here where `client_visible` is
+ * true — a human on the internal side reviewed the actual file and released
+ * it, it is never a scan result. This query does not need to filter on
+ * `client_visible` itself (the database already will not return anything
+ * else to a client seat), but it is named here to make the intent explicit.
+ */
+export async function listClientVisibleDocuments(projectId: string) {
+  const { data, error } = await supabase
+    .from("drawings")
+    .select("id, file_name, document_kind, created_at, client_visible_at, storage_path")
+    .eq("project_id", projectId)
+    .eq("client_visible", true)
+    .order("client_visible_at", { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function getDocumentDownloadUrl(storagePath: string) {
+  const { data, error } = await supabase.storage.from("drawings").createSignedUrl(storagePath, 60);
+  if (error || !data) throw error ?? new Error("Could not open that file.");
+  return data.signedUrl;
+}
+
 export async function getProformaClient(clientId: string) {
   const { data, error } = await supabase
     .from("clients")

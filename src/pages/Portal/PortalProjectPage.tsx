@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft } from "lucide-react";
+import { toast } from "sonner";
+import { ArrowLeft, Download, FileText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +10,9 @@ import { StageTimeline } from "@/components/portal/StageTimeline";
 import { ProformaViewerDialog } from "@/components/portal/ProformaViewerDialog";
 import { RenderingPanel } from "@/components/project/RenderingPanel";
 import {
+  getDocumentDownloadUrl,
   getPortalProject,
+  listClientVisibleDocuments,
   listProjectApprovals,
   listProjectProformas,
 } from "@/services/portalService";
@@ -36,6 +39,25 @@ export function PortalProjectPage({ projectId }: { projectId: string }) {
     queryKey: ["portal-proformas", projectId],
     queryFn: () => listProjectProformas(projectId),
   });
+
+  const documents = useQuery({
+    queryKey: ["portal-documents", projectId],
+    queryFn: () => listClientVisibleDocuments(projectId),
+  });
+
+  async function download(storagePath: string, name: string) {
+    try {
+      const url = await getDocumentDownloadUrl(storagePath);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name;
+      a.target = "_blank";
+      a.rel = "noopener";
+      a.click();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not open that file.");
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -86,6 +108,51 @@ export function PortalProjectPage({ projectId }: { projectId: string }) {
           <h2 className="mb-3 font-display text-lg font-semibold tracking-tight">Your rendering</h2>
           <RenderingPanel projectId={projectId} canManage={false} />
         </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Documents shared with you</CardTitle>
+            <CardDescription>
+              Only files UZA has reviewed and released to you appear here — nothing is shared
+              automatically.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <QueryState
+              isLoading={documents.isLoading}
+              error={documents.error}
+              isEmpty={(documents.data?.length ?? 0) === 0}
+              onRetry={() => void documents.refetch()}
+              empty={
+                <EmptyState
+                  title="Nothing shared yet"
+                  description="When UZA releases a drawing or document to you, it will appear here."
+                />
+              }
+            >
+              <ul className="space-y-2">
+                {(documents.data ?? []).map((d) => (
+                  <li
+                    key={d.id}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3"
+                  >
+                    <span className="flex items-center gap-2 font-medium">
+                      <FileText className="size-4 text-muted-foreground" aria-hidden />
+                      {d.file_name}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => void download(d.storage_path, d.file_name)}
+                    >
+                      <Download className="size-4" aria-hidden /> Download
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </QueryState>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>

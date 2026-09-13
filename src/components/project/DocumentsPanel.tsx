@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FileUp, FileWarning, FileText, Download, ScanLine } from "lucide-react";
+import { FileUp, FileWarning, FileText, Download, ScanLine, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -52,11 +52,51 @@ function takeoffReason(ext: string): string | null {
 
 export function DocumentsPanel({ projectId }: { projectId: string }) {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { user, hasRole } = useAuth();
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [reading, setReading] = useState<string | null>(null);
   const read = useServerFn(readDrawing);
+
+  const owner = useQuery({
+    queryKey: ["project-owner", projectId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("projects")
+        .select("owner_id")
+        .eq("id", projectId)
+        .maybeSingle();
+      if (error) throw error;
+      return data?.owner_id ?? null;
+    },
+  });
+
+  /**
+   * Who may review a raw uploaded file and release it to the client (task 7,
+   * case 2): the project owner, china_sourcing, or admin — never the
+   * uploader's own automated say-so, and never a client (this whole panel is
+   * already hidden from a client seat, but the release action itself is also
+   * blocked at the database by a trigger regardless of who can see this UI).
+   */
+  const canReleaseDocuments =
+    Boolean(user?.id) && (user?.id === owner.data || hasRole("china_sourcing") || hasRole("admin"));
+
+  const releaseToClient = useMutation({
+    mutationFn: async ({ id, clientVisible }: { id: string; clientVisible: boolean }) => {
+      const { error } = await supabase.from("drawings").update({ client_visible: clientVisible }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: (_data, { clientVisible }) => {
+      toast.success(
+        clientVisible
+          ? "Released to the client. It will now appear in their portal."
+          : "Withdrawn from the client's view.",
+      );
+      void queryClient.invalidateQueries({ queryKey: ["drawings", projectId] });
+    },
+    onError: (e: unknown) =>
+      toast.error(e instanceof Error ? e.message : "Could not change this document's visibility."),
+  });
 
   const readFile = useMutation({
     mutationFn: async (drawingId: string) => read({ data: { drawingId } }),
@@ -193,6 +233,7 @@ export function DocumentsPanel({ projectId }: { projectId: string }) {
                   <TableHead>File</TableHead>
                   <TableHead>Kind</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Client visibility</TableHead>
                   <TableHead className="text-right">Size</TableHead>
                   <TableHead />
                 </TableRow>
@@ -221,6 +262,30 @@ export function DocumentsPanel({ projectId }: { projectId: string }) {
                         <Badge variant="secondary" className="capitalize">
                           {d.status}
                         </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {d.client_visible ? (
+                        <Badge className="gap-1">
+                          <Eye className="size-3" aria-hidden /> Released to client
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="gap-1">
+                          <EyeOff className="size-3" aria-hidden /> Internal only
+                        </Badge>
+                      )}
+                      {canReleaseDocuments && (
+                        <Button
+                          variant="link"
+                          size="sm"
+                          className="h-auto p-0 pl-2 text-xs"
+                          disabled={releaseToClient.isPending}
+                          onClick={() =>
+                            releaseToClient.mutate({ id: d.id, clientVisible: !d.client_visible })
+                          }
+                        >
+                          {d.client_visible ? "Withdraw" : "Review & release"}
+                        </Button>
                       )}
                     </TableCell>
                     <TableCell className="tabular text-right">

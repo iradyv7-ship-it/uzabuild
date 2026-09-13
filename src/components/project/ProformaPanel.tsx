@@ -35,6 +35,7 @@ import { proformaReference, rmbToUsdMinor, rollUpProforma } from "@/lib/proforma
 import { parseFactoryQuote } from "@/lib/proforma.functions";
 import { buildProformaPdf } from "@/lib/proforma-pdf.functions";
 import { getUsdRmbRate } from "@/lib/fx.functions";
+import { verifyNoForeignBranding } from "@/lib/confidentiality.functions";
 import { FX_MAX_AGE_HOURS } from "@/config/policy";
 import { ProformaDocument } from "@/components/project/ProformaDocument";
 import { useAuth } from "@/context/AuthContext";
@@ -71,6 +72,7 @@ export function ProformaPanel({
   const [quoteText, setQuoteText] = useState("");
   const [draft, setDraft] = useState<DraftLine[]>([]);
 
+  const verifyBranding = useServerFn(verifyNoForeignBranding);
   const fetchRate = useServerFn(getUsdRmbRate);
   const fx = useQuery({
     queryKey: ["fx-usd-rmb"],
@@ -258,6 +260,22 @@ export function ProformaPanel({
       if (name === "" || jobTitle === "") {
         throw new Error("Enter the signatory's full name and job title before signing.");
       }
+
+      // Automated confidentiality check: this text is entirely
+      // system-generated (the client only ever sees UZA Solutions), so a
+      // reliable scan is possible here — unlike a raw uploaded file. Blocks
+      // the issue outright if a known non-UZA name is found.
+      const brandingText = [
+        activeProforma?.title ?? "",
+        ...(lines.data ?? []).map((l) => `${l.description} ${l.specification ?? ""}`),
+      ].join(" ");
+      const branding = await verifyBranding({ data: { text: brandingText } });
+      if (!branding.clean) {
+        throw new Error(
+          `Cannot issue: this proforma mentions a non-UZA name (${branding.matches.join(", ")}). Remove it before issuing — only "UZA Solutions" or "UZA Build" may appear to the client.`,
+        );
+      }
+
       const { error } = await supabase
         .from("proformas")
         .update({
