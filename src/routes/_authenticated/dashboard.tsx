@@ -23,6 +23,14 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 function Dashboard() {
   const { fullName, roles, isCostBlind } = useAuth();
   if (isCostBlind) return <Navigate to="/portal" replace />;
+  // Cecilia's dedicated workspace (task 3): china_sourcing lands on the
+  // sourcing desk instead of the general dashboard, same redirect pattern as
+  // the client portal above. An admin who also happens to hold the
+  // china_sourcing seat still sees the general dashboard — admin is not
+  // redirected away from anything.
+  if (roles.includes("china_sourcing") && !roles.includes("admin")) {
+    return <Navigate to="/sourcing-desk" replace />;
+  }
 
   const { data: counts } = useQuery({
     queryKey: ["dashboard-counts"],

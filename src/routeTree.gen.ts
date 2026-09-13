@@ -19,6 +19,7 @@ import { Route as AuthenticatedLearningRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedManufacturersRouteImport } from './routes/_authenticated/manufacturers'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedSourcingRouteImport } from './routes/_authenticated/sourcing'
+import { Route as AuthenticatedSourcingDeskRouteImport } from './routes/_authenticated/sourcing-desk'
 import { Route as AuthResetRouteImport } from './routes/auth.reset'
 import { Route as AuthenticatedPortalIndexRouteImport } from './routes/_authenticated/portal.index'
 import { Route as AuthenticatedPortalProjectIdRouteImport } from './routes/_authenticated/portal.$projectId'
@@ -75,6 +76,12 @@ const AuthenticatedSourcingRoute = AuthenticatedSourcingRouteImport.update({
   path: '/sourcing',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedSourcingDeskRoute =
+  AuthenticatedSourcingDeskRouteImport.update({
+    id: '/sourcing-desk',
+    path: '/sourcing-desk',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthResetRoute = AuthResetRouteImport.update({
   id: '/reset',
   path: '/reset',
@@ -115,6 +122,7 @@ export interface FileRoutesByFullPath {
   '/manufacturers': typeof AuthenticatedManufacturersRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/sourcing': typeof AuthenticatedSourcingRoute
+  '/sourcing-desk': typeof AuthenticatedSourcingDeskRoute
   '/auth/reset': typeof AuthResetRoute
   '/portal/$projectId': typeof AuthenticatedPortalProjectIdRoute
   '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
@@ -131,6 +139,7 @@ export interface FileRoutesByTo {
   '/manufacturers': typeof AuthenticatedManufacturersRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/sourcing': typeof AuthenticatedSourcingRoute
+  '/sourcing-desk': typeof AuthenticatedSourcingDeskRoute
   '/auth/reset': typeof AuthResetRoute
   '/portal/$projectId': typeof AuthenticatedPortalProjectIdRoute
   '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
@@ -149,6 +158,7 @@ export interface FileRoutesById {
   '/_authenticated/manufacturers': typeof AuthenticatedManufacturersRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/sourcing': typeof AuthenticatedSourcingRoute
+  '/_authenticated/sourcing-desk': typeof AuthenticatedSourcingDeskRoute
   '/auth/reset': typeof AuthResetRoute
   '/_authenticated/portal/$projectId': typeof AuthenticatedPortalProjectIdRoute
   '/_authenticated/projects_/$projectId': typeof AuthenticatedProjectsProjectIdRoute
@@ -167,6 +177,7 @@ export interface FileRouteTypes {
     | '/manufacturers'
     | '/settings'
     | '/sourcing'
+    | '/sourcing-desk'
     | '/auth/reset'
     | '/portal/$projectId'
     | '/projects/$projectId'
@@ -183,6 +194,7 @@ export interface FileRouteTypes {
     | '/manufacturers'
     | '/settings'
     | '/sourcing'
+    | '/sourcing-desk'
     | '/auth/reset'
     | '/portal/$projectId'
     | '/projects/$projectId'
@@ -200,6 +212,7 @@ export interface FileRouteTypes {
     | '/_authenticated/manufacturers'
     | '/_authenticated/settings'
     | '/_authenticated/sourcing'
+    | '/_authenticated/sourcing-desk'
     | '/auth/reset'
     | '/_authenticated/portal/$projectId'
     | '/_authenticated/projects_/$projectId'
@@ -285,6 +298,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSourcingRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/sourcing-desk': {
+      id: '/_authenticated/sourcing-desk'
+      path: '/sourcing-desk'
+      fullPath: '/sourcing-desk'
+      preLoaderRoute: typeof AuthenticatedSourcingDeskRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/auth/reset': {
       id: '/auth/reset'
       path: '/reset'
@@ -331,6 +351,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedManufacturersRoute: typeof AuthenticatedManufacturersRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedSourcingRoute: typeof AuthenticatedSourcingRoute
+  AuthenticatedSourcingDeskRoute: typeof AuthenticatedSourcingDeskRoute
   AuthenticatedPortalProjectIdRoute: typeof AuthenticatedPortalProjectIdRoute
   AuthenticatedProjectsProjectIdRoute: typeof AuthenticatedProjectsProjectIdRoute
   AuthenticatedPortalIndexRoute: typeof AuthenticatedPortalIndexRoute
@@ -345,6 +366,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedManufacturersRoute: AuthenticatedManufacturersRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedSourcingRoute: AuthenticatedSourcingRoute,
+  AuthenticatedSourcingDeskRoute: AuthenticatedSourcingDeskRoute,
   AuthenticatedPortalProjectIdRoute: AuthenticatedPortalProjectIdRoute,
   AuthenticatedProjectsProjectIdRoute: AuthenticatedProjectsProjectIdRoute,
   AuthenticatedPortalIndexRoute: AuthenticatedPortalIndexRoute,
