@@ -168,8 +168,26 @@ export const FX_SOURCE_LABEL = "open.er-api.com (published USD reference rates)"
 /** ASSUMED — how long a fetched rate stays usable before we refresh it (hours). */
 export const FX_MAX_AGE_HOURS = 12;
 
-/** ASSUMED — internal working rate used only when no published rate can be reached. */
-export const FX_FALLBACK_RMB_PER_USD = 7.1;
+/**
+ * CONFIRMED (founder, Sept 2026) — the default RMB/USD basis a new proforma
+ * starts from, and the last-resort fallback when no published rate can be
+ * reached at all.
+ *
+ * This is NOT a market-rate approximation. The real published market rate is
+ * roughly 7.1 RMB/USD (see `getUsdRmbRate` in src/lib/fx.functions.ts, which
+ * still fetches it live, for reference). 6 is deliberately lower than the
+ * real rate: rmbToUsdMinor divides RMB by this rate, so a LOWER divisor
+ * produces a HIGHER USD figure for the same RMB factory cost — quoting off 6
+ * instead of 7.1 bakes in UZA's margin on every factory quotation converted
+ * to a client price. It is a standing commercial decision, not a figure to
+ * keep in sync with the market.
+ *
+ * A preparer still sees the real published rate for reference and can type a
+ * different rate for a specific deal (the "RMB per USD" field on
+ * ProformaPanel.tsx, pinned per document) — this constant only sets what a
+ * NEW proforma starts from before that override.
+ */
+export const FX_FALLBACK_RMB_PER_USD = 6;
 
 /* ------------------------------------------------------------------ */
 /* Stage gate — who must sign a stage off before the next one starts   */
