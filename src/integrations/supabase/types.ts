@@ -347,6 +347,10 @@ export type Database = {
       }
       catalog_items: {
         Row: {
+          client_showcase: boolean
+          image_url: string | null
+          model_url: string | null
+          swatch_hex: string | null
           attributes: Json
           category_id: string
           code: string | null
@@ -371,6 +375,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          client_showcase?: boolean
+          image_url?: string | null
+          model_url?: string | null
+          swatch_hex?: string | null
           attributes?: Json
           category_id: string
           code?: string | null
@@ -395,6 +403,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          client_showcase?: boolean
+          image_url?: string | null
+          model_url?: string | null
+          swatch_hex?: string | null
           attributes?: Json
           category_id?: string
           code?: string | null
@@ -716,6 +728,209 @@ export type Database = {
           },
         ]
       }
+      client_selections: {
+        Row: {
+          alternative_item_id: string | null
+          alternative_title: string | null
+          attachment_path: string | null
+          catalog_item_id: string | null
+          colour_hex: string | null
+          created_at: string
+          created_by: string | null
+          created_by_name: string | null
+          id: string
+          kind: string
+          notes: string | null
+          project_id: string
+          area_label: string | null
+          responded_at: string | null
+          responded_by: string | null
+          responded_by_name: string | null
+          room_id: string | null
+          status: string
+          team_response: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          alternative_item_id?: string | null
+          alternative_title?: string | null
+          attachment_path?: string | null
+          catalog_item_id?: string | null
+          colour_hex?: string | null
+          created_at?: string
+          created_by?: string | null
+          created_by_name?: string | null
+          id?: string
+          kind: string
+          notes?: string | null
+          project_id: string
+          area_label?: string | null
+          responded_at?: string | null
+          responded_by?: string | null
+          responded_by_name?: string | null
+          room_id?: string | null
+          status?: string
+          team_response?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          alternative_item_id?: string | null
+          alternative_title?: string | null
+          attachment_path?: string | null
+          catalog_item_id?: string | null
+          colour_hex?: string | null
+          created_at?: string
+          created_by?: string | null
+          created_by_name?: string | null
+          id?: string
+          kind?: string
+          notes?: string | null
+          project_id?: string
+          area_label?: string | null
+          responded_at?: string | null
+          responded_by?: string | null
+          responded_by_name?: string | null
+          room_id?: string | null
+          status?: string
+          team_response?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_selections_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_selections_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_selections_catalog_item_id_fkey"
+            columns: ["catalog_item_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_selections_alternative_item_id_fkey"
+            columns: ["alternative_item_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_access_grants: {
+        Row: {
+          created_at: string
+          drawing_id: string
+          granted_by: string | null
+          grantee_role: Database["public"]["Enums"]["app_role"] | null
+          grantee_user_id: string | null
+          id: string
+          note: string | null
+          project_id: string
+        }
+        Insert: {
+          created_at?: string
+          drawing_id: string
+          granted_by?: string | null
+          grantee_role?: Database["public"]["Enums"]["app_role"] | null
+          grantee_user_id?: string | null
+          id?: string
+          note?: string | null
+          project_id: string
+        }
+        Update: {
+          created_at?: string
+          drawing_id?: string
+          granted_by?: string | null
+          grantee_role?: Database["public"]["Enums"]["app_role"] | null
+          grantee_user_id?: string | null
+          id?: string
+          note?: string | null
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_access_grants_drawing_id_fkey"
+            columns: ["drawing_id"]
+            isOneToOne: false
+            referencedRelation: "drawings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_access_grants_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_activity: {
+        Row: {
+          actor_id: string | null
+          actor_name: string | null
+          body: string | null
+          client_visible: boolean
+          created_at: string
+          drawing_id: string
+          id: string
+          kind: string
+          project_id: string
+          status: string | null
+        }
+        Insert: {
+          actor_id?: string | null
+          actor_name?: string | null
+          body?: string | null
+          client_visible?: boolean
+          created_at?: string
+          drawing_id: string
+          id?: string
+          kind: string
+          project_id: string
+          status?: string | null
+        }
+        Update: {
+          actor_id?: string | null
+          actor_name?: string | null
+          body?: string | null
+          client_visible?: boolean
+          created_at?: string
+          drawing_id?: string
+          id?: string
+          kind?: string
+          project_id?: string
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_activity_drawing_id_fkey"
+            columns: ["drawing_id"]
+            isOneToOne: false
+            referencedRelation: "drawings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_activity_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       drawing_speckle_models: {
         Row: {
           created_at: string
@@ -784,6 +999,10 @@ export type Database = {
       }
       drawings: {
         Row: {
+          access_restricted: boolean
+          client_note: string | null
+          review_status: string | null
+          submitted_by_client: boolean
           client_visible: boolean
           client_visible_at: string | null
           client_visible_by: string | null
@@ -806,6 +1025,10 @@ export type Database = {
           uploaded_by: string | null
         }
         Insert: {
+          access_restricted?: boolean
+          client_note?: string | null
+          review_status?: string | null
+          submitted_by_client?: boolean
           client_visible?: boolean
           client_visible_at?: string | null
           client_visible_by?: string | null
@@ -828,6 +1051,10 @@ export type Database = {
           uploaded_by?: string | null
         }
         Update: {
+          access_restricted?: boolean
+          client_note?: string | null
+          review_status?: string | null
+          submitted_by_client?: boolean
           client_visible?: boolean
           client_visible_at?: string | null
           client_visible_by?: string | null
@@ -2995,6 +3222,27 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_read_drawing: {
+        Args: { _drawing_id: string; _user_id: string }
+        Returns: boolean
+      }
+      client_showcase_items: {
+        Args: never
+        Returns: {
+          category: string
+          description: string | null
+          id: string
+          image_url: string | null
+          model_url: string | null
+          name: string
+          swatch_hex: string | null
+          unit: string
+        }[]
+      }
+      is_project_lead: {
+        Args: { _project_id: string; _user_id: string }
+        Returns: boolean
+      }
       can_access_project: {
         Args: { _project_id: string; _user_id: string }
         Returns: boolean

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { History, Plus } from "lucide-react";
+import { Eye, History, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CURRENCIES, money, type Currency } from "@/lib/boq";
@@ -36,6 +45,7 @@ function CatalogPage() {
   const { user } = useAuth();
   const [categoryId, setCategoryId] = useState<string>("all");
   const [search, setSearch] = useState("");
+  const [showcaseItem, setShowcaseItem] = useState<ShowcaseFields | null>(null);
   const [historyItem, setHistoryItem] = useState<string | null>(null);
 
   const { data: categories = [] } = useQuery({
@@ -133,6 +143,7 @@ function CatalogPage() {
                 <TableHead>Unit</TableHead>
                 <TableHead className="text-right">Price</TableHead>
                 <TableHead>Source</TableHead>
+                <TableHead>Clients</TableHead>
                 <TableHead className="w-40">Update price</TableHead>
                 <TableHead />
               </TableRow>
@@ -140,14 +151,14 @@ function CatalogPage() {
             <TableBody>
               {isLoading && (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
                     Loading…
                   </TableCell>
                 </TableRow>
               )}
               {!isLoading && visible.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
                     No items yet. Add the first one.
                   </TableCell>
                 </TableRow>
@@ -168,6 +179,17 @@ function CatalogPage() {
                     <span className="ml-2 text-xs text-muted-foreground">{item.price_date}</span>
                   </TableCell>
                   <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="gap-1"
+                      onClick={() => setShowcaseItem(item)}
+                    >
+                      <Eye className="size-4" aria-hidden />
+                      {item.client_showcase ? "Shown" : "Hidden"}
+                    </Button>
+                  </TableCell>
+                  <TableCell>
                     <PriceEditor
                       current={Number(item.price)}
                       onSave={(price, source) => updatePrice.mutate({ id: item.id, price, source })}
@@ -184,6 +206,17 @@ function CatalogPage() {
           </Table>
         </CardContent>
       </Card>
+
+      {showcaseItem && (
+        <ShowcaseDialog
+          item={showcaseItem}
+          onClose={() => setShowcaseItem(null)}
+          onSaved={() => {
+            setShowcaseItem(null);
+            void queryClient.invalidateQueries({ queryKey: ["catalog-items"] });
+          }}
+        />
+      )}
 
       <Dialog open={!!historyItem} onOpenChange={(o) => !o && setHistoryItem(null)}>
         <DialogContent>
@@ -204,6 +237,130 @@ function CatalogPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+type ShowcaseFields = {
+  id: string;
+  name: string;
+  client_showcase: boolean;
+  image_url: string | null;
+  model_url: string | null;
+  swatch_hex: string | null;
+};
+
+/**
+ * What a client sees of this item on their design board: name, description,
+ * a picture, a 3D link and a colour swatch — never price, supplier or
+ * attributes (client_showcase_items(), 20261009120000).
+ */
+function ShowcaseDialog({
+  item,
+  onClose,
+  onSaved,
+}: {
+  item: ShowcaseFields;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [form, setForm] = useState({
+    client_showcase: item.client_showcase,
+    image_url: item.image_url ?? "",
+    model_url: item.model_url ?? "",
+    swatch_hex: item.swatch_hex ?? "",
+  });
+  const save = useMutation({
+    mutationFn: async () => {
+      for (const url of [form.image_url, form.model_url]) {
+        if (url && !/^https?:\/\//i.test(url)) throw new Error("Links must start with https://");
+      }
+      if (form.swatch_hex && !/^#[0-9a-f]{6}$/i.test(form.swatch_hex)) {
+        throw new Error("Swatch must be a colour like #d9cbb5.");
+      }
+      const { error } = await supabase
+        .from("catalog_items")
+        .update({
+          client_showcase: form.client_showcase,
+          image_url: form.image_url.trim() || null,
+          model_url: form.model_url.trim() || null,
+          swatch_hex: form.swatch_hex || null,
+        })
+        .eq("id", item.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success(form.client_showcase ? "Clients can now choose this item." : "Hidden from clients.");
+      onSaved();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Show “{item.name}” to clients</DialogTitle>
+          <DialogDescription>
+            Clients see the name, description, picture, 3D link and swatch on their design board.
+            Price and supplier are never shown.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Switch
+              id="sc-show"
+              checked={form.client_showcase}
+              onCheckedChange={(v) => setForm({ ...form, client_showcase: v })}
+            />
+            <Label htmlFor="sc-show">Show on client design boards</Label>
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="sc-image">Picture link</Label>
+            <Input
+              id="sc-image"
+              placeholder="https://…"
+              value={form.image_url}
+              onChange={(e) => setForm({ ...form, image_url: e.target.value })}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="sc-model">3D model link (Speckle, Sketchfab…)</Label>
+            <Input
+              id="sc-model"
+              placeholder="https://…"
+              value={form.model_url}
+              onChange={(e) => setForm({ ...form, model_url: e.target.value })}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="sc-swatch">Colour swatch</Label>
+            <div className="flex items-center gap-2">
+              <input
+                id="sc-swatch"
+                type="color"
+                value={form.swatch_hex || "#ffffff"}
+                onChange={(e) => setForm({ ...form, swatch_hex: e.target.value })}
+                className="h-9 w-14 cursor-pointer rounded border bg-transparent"
+              />
+              <span className="tabular text-sm text-muted-foreground">{form.swatch_hex || "none"}</span>
+              {form.swatch_hex && (
+                <Button variant="link" size="sm" onClick={() => setForm({ ...form, swatch_hex: "" })}>
+                  Clear
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={() => save.mutate()} disabled={save.isPending}>
+            {save.isPending ? "Saving…" : "Save"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

@@ -86,3 +86,15 @@ Documented in README.
 - [ ] BOQ preparation fee is policy only (ASSUMED), not billed anywhere yet
 - [x] Phases + factory commitment tracking (confirmed, deposit paid, in production, shipping)
 - [x] Cross-project Sourcing Board and copyable "what we still need" request list
+
+## Client workspace — drawings, progress, access grants, design board (9 Oct 2026)
+- [x] Clients submit technical drawings from their portal (PDF, DWG, DXF, IFC, RVT, SKP, images, Excel, Word); each one is a restricted client submission with status "Received", set by the database.
+- [x] Clients follow the work on each document: status (received → being reviewed → in progress → needs revision → accepted), team updates marked client-visible, and their own comments.
+- [x] Per-document access grants: a project lead (owner, project manager, admin) routes a client submission to a discipline seat (architect, QS, interior designer, MEP, procurement, China sourcing) or a named person. Nobody else, and no assistant, reads it until then.
+- [x] Discipline assistant (architect / QS / interior designer / MEP) on the Drawings tab: reads the PDFs, images and CAD digests the asker can access, plus rooms and the design board. Advises only.
+- [x] Client design board: browse showcase products (picture, 3D link, swatch — never price), propose products, colours, reference pictures and ideas per room; the team accepts, customises with an alternative, or declines with a reason. Team side is the "Client board" tab.
+- [x] Catalog: "Shown to clients" setting per item with picture link, 3D link and swatch.
+- [x] Security fixes: the FOR ALL "team write" policies also granted SELECT, so clients could read every internal drawing and write houses/floors/rooms/solar/Speckle rows; the China-sourcing drawings policy also covered client members; storage read was folder-wide. All closed and tested against a local Supabase Postgres (34 checks).
+- [ ] Picture upload for showcase items (links only today).
+- [ ] Notify the client (email/WhatsApp) when a status or answer changes.
+- [ ] Move the five Claude call sites to the Anthropic SDK and one model constant.

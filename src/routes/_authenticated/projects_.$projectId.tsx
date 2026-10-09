@@ -51,6 +51,7 @@ import { ProformaPanel } from "@/components/project/ProformaPanel";
 import { toMinor } from "@/lib/pricing";
 import { downloadBoqWorkbook, type XlsxLine, type XlsxRollup } from "@/lib/boq-xlsx";
 import { InvitePanel } from "@/components/project/InvitePanel";
+import { DesignBoard } from "@/components/portal/DesignBoard";
 import type { ProjectStageKey } from "@/config/policy";
 
 
@@ -443,6 +444,7 @@ function ProjectBoq() {
         <TabsList className="flex h-auto w-full flex-wrap justify-start">
           {!isCostBlind && <TabsTrigger value="overview">Overview</TabsTrigger>}
           {!isCostBlind && <TabsTrigger value="discovery">Client brief</TabsTrigger>}
+          {!isCostBlind && <TabsTrigger value="client-board">Client board</TabsTrigger>}
           {!isCostBlind && <TabsTrigger value="coordination">Discussions</TabsTrigger>}
           {!isCostBlind && <TabsTrigger value="documents">Drawings</TabsTrigger>}
           {!isCostBlind && <TabsTrigger value="rendering">3D rendering</TabsTrigger>}
@@ -469,6 +471,12 @@ function ProjectBoq() {
         {!isCostBlind && (
           <TabsContent value="discovery">
             <DiscoveryPanel projectId={projectId} />
+          </TabsContent>
+        )}
+
+        {!isCostBlind && (
+          <TabsContent value="client-board">
+            <DesignBoard projectId={projectId} mode="team" />
           </TabsContent>
         )}
 

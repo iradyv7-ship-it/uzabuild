@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FileUp, FileWarning, FileText, Download, ScanLine, Eye, EyeOff } from "lucide-react";
+import { FileUp, FileWarning, FileText, Download, ScanLine, Eye, EyeOff, Lock, Inbox } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,9 @@ import { QueryState, EmptyState } from "@/components/DataState";
 import { useServerFn } from "@tanstack/react-start";
 import { readDrawing } from "@/lib/drawings.functions";
 import { useAuth } from "@/context/AuthContext";
+import { reviewStatusLabel } from "@/services/clientWorkspaceService";
+import { DocumentWorkDialog, type WorkDocument } from "@/components/project/DocumentWorkDialog";
+import { DisciplineAssistant } from "@/components/project/DisciplineAssistant";
 
 /**
  * Formats we can machine-read today. Everything else is accepted, stored, and
@@ -56,6 +59,7 @@ export function DocumentsPanel({ projectId }: { projectId: string }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [reading, setReading] = useState<string | null>(null);
+  const [working, setWorking] = useState<WorkDocument | null>(null);
   const read = useServerFn(readDrawing);
 
   const owner = useQuery({
@@ -80,6 +84,14 @@ export function DocumentsPanel({ projectId }: { projectId: string }) {
    */
   const canReleaseDocuments =
     Boolean(user?.id) && (user?.id === owner.data || hasRole("china_sourcing") || hasRole("admin"));
+
+  /**
+   * Who routes a restricted document to discipline seats. Mirrors
+   * is_project_lead() in 20261009120000 (owner, project manager, admin) —
+   * the database is what actually enforces it.
+   */
+  const isLead =
+    Boolean(user?.id) && (user?.id === owner.data || hasRole("project_manager") || hasRole("admin"));
 
   const releaseToClient = useMutation({
     mutationFn: async ({ id, clientVisible }: { id: string; clientVisible: boolean }) => {
@@ -178,6 +190,9 @@ export function DocumentsPanel({ projectId }: { projectId: string }) {
 
   const rows = drawings.data ?? [];
   const queued = rows.filter((d) => d.requires_human_takeoff);
+  const awaitingRouting = rows.filter(
+    (d) => d.submitted_by_client && d.review_status === "received",
+  );
 
   return (
     <div className="space-y-6">
@@ -189,6 +204,8 @@ export function DocumentsPanel({ projectId }: { projectId: string }) {
             are read by the vision model; CAD/BIM files are read by the universal drawing reader
             (native for DXF/IFC/STEP, label salvage for the proprietary binaries). Everything else is
             stored and queued for human takeoff with the reason shown — nothing fails silently.
+            Client submissions are restricted: you see the ones a project lead has granted to your
+            seat or to you.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -246,6 +263,24 @@ export function DocumentsPanel({ projectId }: { projectId: string }) {
                         <FileText className="size-4 text-muted-foreground" aria-hidden />
                         {d.file_name}
                       </span>
+                      {(d.submitted_by_client || d.access_restricted) && (
+                        <span className="mt-1 flex flex-wrap gap-1">
+                          {d.submitted_by_client && (
+                            <Badge variant="outline" className="gap-1">
+                              <Inbox className="size-3" aria-hidden /> From client ·{" "}
+                              {reviewStatusLabel(d.review_status)}
+                            </Badge>
+                          )}
+                          {d.access_restricted && (
+                            <Badge variant="outline" className="gap-1">
+                              <Lock className="size-3" aria-hidden /> Restricted
+                            </Badge>
+                          )}
+                        </span>
+                      )}
+                      {d.client_note && (
+                        <p className="mt-1 text-xs">Client: “{d.client_note}”</p>
+                      )}
                       {d.human_takeoff_reason && (
                         <p className="mt-1 text-xs text-muted-foreground">
                           {d.human_takeoff_reason}
@@ -295,6 +330,9 @@ export function DocumentsPanel({ projectId }: { projectId: string }) {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
+                        <Button variant="outline" size="sm" onClick={() => setWorking(d)}>
+                          Access & progress
+                        </Button>
                         {(VISION_READABLE.includes(extensionOf(d.file_name)) ||
                           DIGEST_READABLE.includes(extensionOf(d.file_name))) && (
                           <Button
@@ -331,6 +369,42 @@ export function DocumentsPanel({ projectId }: { projectId: string }) {
           </QueryState>
         </CardContent>
       </Card>
+
+      {awaitingRouting.length > 0 && (
+        <Card className="border-primary/40">
+          <CardHeader>
+            <CardTitle className="text-base">
+              New from the client ({awaitingRouting.length})
+            </CardTitle>
+            <CardDescription>
+              {isLead
+                ? "Restricted until you route them: open each one, grant the seats that need it (architect, QS, interior designer, MEP), then set its status — the client sees the status and every update you mark as visible."
+                : "Waiting for a project lead to route these to the right specialists."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {awaitingRouting.map((d) => (
+              <div key={d.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3 text-sm">
+                <span className="font-medium">{d.file_name}</span>
+                <Button size="sm" onClick={() => setWorking(d)}>
+                  Route & review
+                </Button>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      <DisciplineAssistant projectId={projectId} />
+
+      {working && (
+        <DocumentWorkDialog
+          projectId={projectId}
+          doc={rows.find((r) => r.id === working.id) ?? working}
+          isLead={isLead}
+          onClose={() => setWorking(null)}
+        />
+      )}
 
       {queued.length > 0 && (
         <Card>
