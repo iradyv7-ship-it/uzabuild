@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Download, FileUp, Paperclip, Trash2, Factory, AlertTriangle, UserPlus } from "lucide-react";
+import { Download, FileUp, Paperclip, Trash2, Factory, AlertTriangle, UserPlus, Languages } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +27,7 @@ import {
 import { EmptyState } from "@/components/DataState";
 import { useAuth } from "@/context/AuthContext";
 import { inviteManufacturer } from "@/lib/invitations.functions";
+import { RfqDraftDialog } from "@/components/project/RfqDraftDialog";
 import {
   ATTACHMENT_KINDS,
   MANUFACTURER_STATUSES,
@@ -98,6 +99,7 @@ export function PackageDetail({
   const [uploadTarget, setUploadTarget] = useState<{ key: string | null; kind: string } | null>(null);
   const [inviteTarget, setInviteTarget] = useState<{ supplierId: string; name: string } | null>(null);
   const [inviteEmail, setInviteEmail] = useState("");
+  const [rfqOpen, setRfqOpen] = useState(false);
   const [design, setDesign] = useState<Record<string, string>>({});
   const currency = pkg.budget_currency as "RWF" | "USD" | "CNY";
   const [budget, setBudget] = useState<string>(
@@ -529,15 +531,35 @@ export function PackageDetail({
         </CardContent>
       </Card>
 
+      {rfqOpen && (
+        <RfqDraftDialog
+          packageId={pkg.id}
+          packageTitle={pkg.title}
+          manufacturers={mine}
+          supplierNames={Object.fromEntries(
+            coverage
+              .filter((c) => c.suppliers)
+              .map((c) => [c.supplier_id, c.suppliers!.name] as const),
+          )}
+          onClose={() => setRfqOpen(false)}
+          onStatusChanged={invalidate}
+        />
+      )}
+
       {/* manufacturers ------------------------------------------------------ */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Manufacturers for this package</CardTitle>
-          <CardDescription>
-            We keep {MANUFACTURERS_PER_PACKAGE_MIN}–{MANUFACTURERS_PER_PACKAGE_MAX} factories per
-            product family at the same quality level, so a quotation can always be compared against a
-            like-for-like one.
-          </CardDescription>
+        <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3 space-y-0">
+          <div className="space-y-1.5">
+            <CardTitle className="text-base">Manufacturers for this package</CardTitle>
+            <CardDescription>
+              We keep {MANUFACTURERS_PER_PACKAGE_MIN}–{MANUFACTURERS_PER_PACKAGE_MAX} factories per
+              product family at the same quality level, so a quotation can always be compared against a
+              like-for-like one.
+            </CardDescription>
+          </div>
+          <Button variant="outline" onClick={() => setRfqOpen(true)}>
+            <Languages className="size-4" aria-hidden /> Draft RFQ (EN + 中文)
+          </Button>
         </CardHeader>
         <CardContent className="space-y-4">
           {mine.length === 0 ? (

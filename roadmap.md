@@ -98,3 +98,25 @@ Documented in README.
 - [ ] Picture upload for showcase items (links only today).
 - [ ] Notify the client (email/WhatsApp) when a status or answer changes.
 - [ ] Move the five Claude call sites to the Anthropic SDK and one model constant.
+
+## Audit fixes — formats, BOQ, manufacturer RFQs, ease of use (10 Oct 2026)
+- [x] SECURITY: public sign-up could grant itself any staff seat (QS, architect, PM…) and read every client record and the priced catalog. Self sign-up is now client-only; staff seats come only from invitations/bootstrap/admin (migration 20261010090000, tested).
+- [x] Proforma FX now starts from the UZA basis (6 RMB/USD, founder policy) instead of the live ~7.1 market rate; "Reprice" applies the basis; the live rate is shown for reference only.
+- [x] Proposal price was 100× too high for USD/CNY (minor units converted twice); re-seeded from the BOQ each time the dialog opens.
+- [x] Dashboard crash on China-sourcing landing (hooks after an early return); no staff menu flash for clients while roles load.
+- [x] Each seat opens a project on its own tab (QS → Takeoff, architect/MEP → Drawings, designer → Client board, sourcing → Packages); tab kept in the URL (?tab=).
+- [x] Real readers: XLSX/XLSM/XLS/ODS/CSV/TSV (SheetJS, rows and numbers kept), DOCX/PPTX text; HEIC/TIFF/BMP routed to people with a clear reason; images over 5 MB refused with advice. Spreadsheets no longer stick in "processing".
+- [x] readDrawing: every failure marks the drawing failed with a reason; "Read again" replaces draft lines instead of duplicating; truncation and refusals detected.
+- [x] Import an existing BOQ spreadsheet (client's or factory's): AI structures rows, preview + edit, writes houses/floors/rooms and BOQ lines (blank-rate BOQs supported).
+- [x] Takeoff → BOQ bridge: reviewed takeoff lines go into the BOQ with their room and quantity, no retyping; idempotent; reviews also write training_records.
+- [x] Unpriced BOQ lines get a catalog-item picker; deactivated catalog items no longer zero a line's price.
+- [x] Manufacturer RFQ per package: "Draft RFQ (EN + 中文)" builds the spec, quantity schedule from the BOQ and category-specific questions (tiles, lighting, aluminium…), with client, project, budget and price removed; copy + mark sent.
+
+### Still open from the audit
+- [ ] Manufacturer workspace (/supplier): invited factories have no page of their own and cannot download RFQ files.
+- [ ] Factory quotes from PDF/Excel/photo (today paste-only), stored per supplier + package, compared side by side.
+- [ ] Notifications (email/WhatsApp) on client uploads, status changes, RFQ replies.
+- [ ] BOQ versioning (pin rates per issued version), integer minor-unit money columns, FX on mixed-currency BOQ lines, BOQ PDF.
+- [ ] Interface translation (French, Kinyarwanda, Chinese); mobile navigation.
+- [ ] Large drawing sets: page splitting + background reading instead of one request.
+- [ ] Review existing user_roles in production for staff seats created through the old sign-up hole.

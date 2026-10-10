@@ -1,6 +1,17 @@
 import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FileUp, FileWarning, FileText, Download, ScanLine, Eye, EyeOff, Lock, Inbox } from "lucide-react";
+import {
+  FileUp,
+  FileWarning,
+  FileText,
+  Download,
+  ScanLine,
+  Eye,
+  EyeOff,
+  Lock,
+  Inbox,
+  Sheet,
+} from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -21,35 +32,58 @@ import { useAuth } from "@/context/AuthContext";
 import { reviewStatusLabel } from "@/services/clientWorkspaceService";
 import { DocumentWorkDialog, type WorkDocument } from "@/components/project/DocumentWorkDialog";
 import { DisciplineAssistant } from "@/components/project/DisciplineAssistant";
+import { BoqImportDialog } from "@/components/project/BoqImportDialog";
 
+/** Formats the vision reader looks at and measures directly. */
+const VISION_READABLE = ["pdf", "png", "jpg", "jpeg", "webp", "gif"];
 /**
- * Formats we can machine-read today. Everything else is accepted, stored, and
- * queued for human takeoff with a written reason — never silently dropped.
- */
-const MACHINE_READABLE = ["pdf", "xlsx", "xls", "csv"];
-/** Formats the vision reader can look at and measure directly (raster/PDF). */
-const VISION_READABLE = ["pdf", "png", "jpg", "jpeg", "webp"];
-/**
- * CAD/BIM formats read through the universal drawing reader (readAnyDrawing):
- * native for DXF/IFC/STEP, salvage-mode string extraction for the proprietary
- * binaries. Still routed to human takeoff afterwards — the reader recovers
- * layer/room/schedule labels, it does not replace the QS's confirmed quantity.
+ * CAD/BIM formats read through the universal drawing reader: parsed for
+ * DXF/IFC/STEP, label salvage for the proprietary binaries. Always confirmed
+ * by a QS afterwards — the reader recovers labels, not measured quantities.
  */
 const DIGEST_READABLE = ["dxf", "ifc", "step", "stp", "dwg", "rvt", "rfa", "skp", "nwd"];
-const ACCEPTED = ".pdf,.dwg,.dxf,.ifc,.step,.stp,.rvt,.rfa,.skp,.nwd,.png,.jpg,.jpeg,.webp,.xlsx,.xls,.csv,.docx,.doc";
+/** Word and PowerPoint: their text (specifications, schedules) is extracted and read. */
+const TEXT_READABLE = ["docx", "pptx"];
+/** Spreadsheets are imported into the BOQ, not read as drawings. */
+const SPREADSHEETS = ["xlsx", "xlsm", "xls", "ods", "csv", "tsv"];
+/** Accepted and stored, but must be converted before anything can read them. */
+const NOT_READABLE = ["heic", "heif", "tif", "tiff", "bmp", "doc", "ppt"];
+const ACCEPTED = [
+  ...VISION_READABLE,
+  ...DIGEST_READABLE,
+  ...TEXT_READABLE,
+  ...SPREADSHEETS,
+  ...NOT_READABLE,
+]
+  .map((e) => `.${e}`)
+  .join(",");
+
+/** The automatic reader's limit — larger files are stored but must be split to be read. */
+const MAX_READ_BYTES = 18 * 1024 * 1024;
+/** The vision model rejects images above about 5 MB. */
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 function extensionOf(name: string) {
   return name.split(".").pop()?.toLowerCase() ?? "";
 }
 
-function takeoffReason(ext: string): string | null {
-  if (MACHINE_READABLE.includes(ext)) return null;
+function takeoffReason(ext: string, size: number): string | null {
+  if (size > MAX_READ_BYTES)
+    return "Larger than the 18 MB automatic-reader limit — split it into smaller files to read it, or measure by hand.";
+  if (SPREADSHEETS.includes(ext)) return null;
+  if (["png", "jpg", "jpeg", "webp", "gif"].includes(ext) && size > MAX_IMAGE_BYTES)
+    return "Image over 5 MB — the reader cannot take it. Upload a smaller photo or the drawing as a PDF, or measure by hand.";
+  if (ext === "pdf") return null;
   if (DIGEST_READABLE.includes(ext))
     return "Read with the universal drawing reader (layer/room labels salvaged from the file) — a quantity surveyor must still confirm every dimension.";
-  if (["png", "jpg", "jpeg", "webp"].includes(ext))
+  if (["png", "jpg", "jpeg", "webp", "gif"].includes(ext))
     return "Image drawings carry no scale metadata — read it with the drawing reader, then confirm the dimensions.";
-  if (["doc", "docx"].includes(ext))
-    return "Written specifications need a human to translate scope into measurable lines.";
+  if (TEXT_READABLE.includes(ext))
+    return "Written specifications and schedules: read it to draft lines, then a QS turns scope into measurable quantities.";
+  if (["heic", "heif", "tif", "tiff", "bmp"].includes(ext))
+    return `${ext.toUpperCase()} images cannot be read automatically — export as PDF or JPG and upload that, or measure by hand.`;
+  if (["doc", "ppt"].includes(ext))
+    return `Old .${ext} files cannot be read automatically — save as .${ext}x or PDF and upload that.`;
   return "This file type has no automated reader — queued for manual takeoff.";
 }
 
@@ -60,6 +94,7 @@ export function DocumentsPanel({ projectId }: { projectId: string }) {
   const [uploading, setUploading] = useState(false);
   const [reading, setReading] = useState<string | null>(null);
   const [working, setWorking] = useState<WorkDocument | null>(null);
+  const [importing, setImporting] = useState<{ id: string; file_name: string } | null>(null);
   const read = useServerFn(readDrawing);
 
   const owner = useQuery({
@@ -91,11 +126,15 @@ export function DocumentsPanel({ projectId }: { projectId: string }) {
    * the database is what actually enforces it.
    */
   const isLead =
-    Boolean(user?.id) && (user?.id === owner.data || hasRole("project_manager") || hasRole("admin"));
+    Boolean(user?.id) &&
+    (user?.id === owner.data || hasRole("project_manager") || hasRole("admin"));
 
   const releaseToClient = useMutation({
     mutationFn: async ({ id, clientVisible }: { id: string; clientVisible: boolean }) => {
-      const { error } = await supabase.from("drawings").update({ client_visible: clientVisible }).eq("id", id);
+      const { error } = await supabase
+        .from("drawings")
+        .update({ client_visible: clientVisible })
+        .eq("id", id);
       if (error) throw error;
     },
     onSuccess: (_data, { clientVisible }) => {
@@ -142,23 +181,23 @@ export function DocumentsPanel({ projectId }: { projectId: string }) {
   const upload = useMutation({
     mutationFn: async (files: File[]) => {
       for (const file of files) {
-
         const ext = extensionOf(file.name);
         const path = `${projectId}/${crypto.randomUUID()}.${ext}`;
         const { error: storageError } = await supabase.storage.from("drawings").upload(path, file);
         if (storageError) throw storageError;
 
-        const reason = takeoffReason(ext);
+        const reason = takeoffReason(ext, file.size);
         const { error } = await supabase.from("drawings").insert({
           project_id: projectId,
           file_name: file.name,
           storage_path: path,
           file_type: file.type || ext,
           size_bytes: file.size,
-          status: reason ? "pending" : "processing",
+          // Nothing is "processing" until a read actually starts.
+          status: "pending",
           requires_human_takeoff: reason !== null,
           human_takeoff_reason: reason,
-          document_kind: ["doc", "docx", "xlsx", "xls", "csv"].includes(ext)
+          document_kind: [...SPREADSHEETS, "doc", "docx", "ppt", "pptx"].includes(ext)
             ? "document"
             : "drawing",
           uploaded_by: user?.id ?? null,
@@ -167,7 +206,9 @@ export function DocumentsPanel({ projectId }: { projectId: string }) {
       }
     },
     onSuccess: () => {
-      toast.success("Uploaded. Anything we cannot read is in the human takeoff queue.");
+      toast.success(
+        "Uploaded. Read drawings and documents with “Read”, bring spreadsheets in with “Import as BOQ” — anything that cannot be read is in the human takeoff queue with the reason.",
+      );
       void queryClient.invalidateQueries({ queryKey: ["drawings", projectId] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -200,10 +241,12 @@ export function DocumentsPanel({ projectId }: { projectId: string }) {
         <CardHeader>
           <CardTitle>Drawings & documents</CardTitle>
           <CardDescription>
-            PDF, DWG/DXF, IFC/STEP, RVT, SKP, images, XLSX and DOCX are all accepted. PDFs and images
-            are read by the vision model; CAD/BIM files are read by the universal drawing reader
-            (native for DXF/IFC/STEP, label salvage for the proprietary binaries). Everything else is
-            stored and queued for human takeoff with the reason shown — nothing fails silently.
+            PDFs and images (up to 5 MB) are read by the vision model. CAD/BIM files go through the
+            universal drawing reader (parsed for DXF/IFC/STEP, label salvage for DWG, RVT, SKP).
+            Word and PowerPoint text is extracted and read. Excel, CSV and ODS spreadsheets — an
+            existing BOQ, a schedule, a price list — are imported straight into the BOQ. HEIC/TIFF
+            photos and old .doc files are stored but must be converted first. The reader takes files
+            up to 18 MB; every file it cannot read sits in the human takeoff queue with the reason.
             Client submissions are restricted: you see the ones a project lead has granted to your
             seat or to you.
           </CardDescription>
@@ -221,12 +264,17 @@ export function DocumentsPanel({ projectId }: { projectId: string }) {
               // value empties the live FileList and the upload would be a no-op.
               const files = Array.from(e.target.files ?? []);
               e.target.value = "";
+              const tooLarge = files.filter((f) => f.size > MAX_READ_BYTES);
+              if (tooLarge.length > 0) {
+                toast.warning(
+                  `${tooLarge.map((f) => f.name).join(", ")} ${tooLarge.length === 1 ? "is" : "are"} over 18 MB — stored, but the automatic reader cannot read ${tooLarge.length === 1 ? "it" : "them"}. Split into smaller files to have them read.`,
+                );
+              }
               if (files.length > 0) {
                 setUploading(true);
                 upload.mutate(files);
               }
             }}
-
           />
           <Button onClick={() => inputRef.current?.click()} disabled={uploading}>
             <FileUp className="size-4" /> {uploading ? "Uploading…" : "Upload files"}
@@ -278,9 +326,7 @@ export function DocumentsPanel({ projectId }: { projectId: string }) {
                           )}
                         </span>
                       )}
-                      {d.client_note && (
-                        <p className="mt-1 text-xs">Client: “{d.client_note}”</p>
-                      )}
+                      {d.client_note && <p className="mt-1 text-xs">Client: “{d.client_note}”</p>}
                       {d.human_takeoff_reason && (
                         <p className="mt-1 text-xs text-muted-foreground">
                           {d.human_takeoff_reason}
@@ -333,25 +379,37 @@ export function DocumentsPanel({ projectId }: { projectId: string }) {
                         <Button variant="outline" size="sm" onClick={() => setWorking(d)}>
                           Access & progress
                         </Button>
-                        {(VISION_READABLE.includes(extensionOf(d.file_name)) ||
-                          DIGEST_READABLE.includes(extensionOf(d.file_name))) && (
+                        {SPREADSHEETS.includes(extensionOf(d.file_name)) && (
                           <Button
                             variant="outline"
                             size="sm"
-                            disabled={reading !== null}
-                            onClick={() => {
-                              setReading(d.id);
-                              readFile.mutate(d.id);
-                            }}
+                            onClick={() => setImporting({ id: d.id, file_name: d.file_name })}
                           >
-                            <ScanLine className="size-4" />
-                            {reading === d.id
-                              ? "Reading…"
-                              : d.status === "extracted"
-                                ? "Read again"
-                                : "Read drawing"}
+                            <Sheet className="size-4" />
+                            Import as BOQ
                           </Button>
                         )}
+                        {(VISION_READABLE.includes(extensionOf(d.file_name)) ||
+                          DIGEST_READABLE.includes(extensionOf(d.file_name)) ||
+                          TEXT_READABLE.includes(extensionOf(d.file_name))) &&
+                          Number(d.size_bytes ?? 0) <= MAX_READ_BYTES && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={reading !== null}
+                              onClick={() => {
+                                setReading(d.id);
+                                readFile.mutate(d.id);
+                              }}
+                            >
+                              <ScanLine className="size-4" />
+                              {reading === d.id
+                                ? "Reading…"
+                                : d.status === "extracted"
+                                  ? "Read again"
+                                  : "Read drawing"}
+                            </Button>
+                          )}
                         <Button
                           variant="ghost"
                           size="sm"
@@ -384,7 +442,10 @@ export function DocumentsPanel({ projectId }: { projectId: string }) {
           </CardHeader>
           <CardContent className="space-y-2">
             {awaitingRouting.map((d) => (
-              <div key={d.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3 text-sm">
+              <div
+                key={d.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3 text-sm"
+              >
                 <span className="font-medium">{d.file_name}</span>
                 <Button size="sm" onClick={() => setWorking(d)}>
                   Route & review
@@ -396,6 +457,14 @@ export function DocumentsPanel({ projectId }: { projectId: string }) {
       )}
 
       <DisciplineAssistant projectId={projectId} />
+
+      {importing && (
+        <BoqImportDialog
+          projectId={projectId}
+          drawing={importing}
+          onClose={() => setImporting(null)}
+        />
+      )}
 
       {working && (
         <DocumentWorkDialog

@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { readAnyDrawing } from "@/lib/drawing-reader.server";
+import { readAnyDocument } from "@/lib/drawing-reader.server";
 import { roleLabel, type AppRole } from "@/constants/roles";
 
 /**
@@ -232,7 +232,7 @@ export const disciplineAssistant = createServerFn({ method: "POST" })
         listedOnly.push(d.file_name);
         continue;
       }
-      const source = readAnyDrawing({ bytes, fileName: d.file_name, mimeType: d.file_type });
+      const source = await readAnyDocument({ bytes, fileName: d.file_name, mimeType: d.file_type });
       const label =
         `Document: ${d.file_name}` +
         (d.submitted_by_client ? " (submitted by the client)" : "") +
@@ -255,7 +255,7 @@ export const disciplineAssistant = createServerFn({ method: "POST" })
       } else if (source.text?.trim()) {
         content.push({
           type: "text",
-          text: `${label}\n[${source.method}; a lossy digest, not the drawing itself]\n${source.text}`,
+          text: `${label}\n[${source.method}${source.degraded ? "; a lossy digest, not the drawing itself" : ""}]\n${source.text}`,
         });
       } else {
         listedOnly.push(d.file_name);

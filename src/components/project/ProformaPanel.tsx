@@ -79,8 +79,10 @@ export function ProformaPanel({
     queryFn: () => fetchRate({}),
     staleTime: FX_MAX_AGE_HOURS * 60 * 60 * 1000,
   });
-  const liveRate = fx.data?.rate ?? RMB_PER_USD;
-  const rate = rateOverride ?? String(liveRate);
+  // A new proforma starts from the UZA basis (FX_FALLBACK_RMB_PER_USD, founder
+  // policy: deliberately below the market rate so the margin is built in). The
+  // published rate is shown for reference only — it never becomes the default.
+  const rate = rateOverride ?? String(RMB_PER_USD);
 
   const project = useQuery({
     queryKey: ["project-client", projectId],
@@ -161,7 +163,7 @@ export function ProformaPanel({
 
   const create = useMutation({
     mutationFn: async () => {
-      const fxRate = Number(rate) > 0 ? Number(rate) : liveRate;
+      const fxRate = Number(rate) > 0 ? Number(rate) : RMB_PER_USD;
       const reference = proformaReference((proformas.data?.length ?? 0) + 1);
       const { data: header, error } = await supabase
         .from("proformas")
@@ -351,25 +353,25 @@ export function ProformaPanel({
   const reprice = useMutation({
     mutationFn: async () => {
       if (!activeProforma) return { before: 0, after: 0 };
-      const fresh = await fetchRate({});
+      const basis = RMB_PER_USD;
       const before = totals.totalUsdMinor;
       const { error } = await supabase
         .from("proformas")
-        .update({ fx_rmb_per_usd: fresh.rate })
+        .update({ fx_rmb_per_usd: basis })
         .eq("id", activeProforma.id);
       if (error) throw error;
       for (const l of lines.data ?? []) {
         const { error: lineError } = await supabase
           .from("proforma_lines")
-          .update({ unit_price_usd_minor: rmbToUsdMinor(l.unit_price_rmb_minor, fresh.rate) })
+          .update({ unit_price_usd_minor: rmbToUsdMinor(l.unit_price_rmb_minor, basis) })
           .eq("id", l.id);
         if (lineError) throw lineError;
       }
       const after = (lines.data ?? []).reduce(
-        (sum, l) => sum + lineAmount(l.quantity, rmbToUsdMinor(l.unit_price_rmb_minor, fresh.rate)),
+        (sum, l) => sum + lineAmount(l.quantity, rmbToUsdMinor(l.unit_price_rmb_minor, basis)),
         0,
       );
-      return { before, after, rate: fresh.rate };
+      return { before, after, rate: basis };
     },
     onSuccess: (result) => {
       void queryClient.invalidateQueries({ queryKey: ["fx-usd-rmb"] });
@@ -378,7 +380,7 @@ export function ProformaPanel({
       const delta = result.after - result.before;
       toast.success(
         delta === 0
-          ? "Repriced — today's rate gives the same client total."
+          ? "Repriced — the UZA basis gives the same client total."
           : `Repriced. Client total ${delta > 0 ? "up" : "down"} by ${formatMoney(Math.abs(delta), "USD")}.`,
       );
     },
@@ -430,11 +432,13 @@ export function ProformaPanel({
                       onChange={(e) => setRateOverride(e.target.value)}
                     />
                     <p className="text-xs text-muted-foreground">
+                      UZA basis is {RMB_PER_USD} RMB per USD (company policy — the margin is built in).
+                      It is pinned onto this proforma; change it only for a specific deal.{" "}
                       {fx.isLoading
-                        ? "Fetching today's published rate…"
+                        ? "Fetching today's published rate for reference…"
                         : fx.data
-                          ? `${fx.data.live ? "Published rate" : "Last known rate"} of ${fx.data.asOf} from ${fx.data.source}. It is pinned onto this proforma.`
-                          : "Published rate unavailable — this is an internal working rate."}
+                          ? `For reference: ${fx.data.live ? "published rate" : "last known rate"} ${fx.data.rate} on ${fx.data.asOf} (${fx.data.source}).`
+                          : "Published reference rate unavailable."}
                     </p>
                     {fx.data?.note && <p className="text-xs text-destructive">{fx.data.note}</p>}
                   </div>
@@ -630,7 +634,7 @@ export function ProformaPanel({
                   disabled={reprice.isPending}
                 >
                   <RefreshCw className="mr-1 size-4" />
-                  {reprice.isPending ? "Repricing…" : "Reprice at today's rate"}
+                  {reprice.isPending ? "Repricing…" : `Reprice at UZA basis (${RMB_PER_USD})`}
                 </Button>
               )}
               {(activeProforma.status !== "issued" || !activeProforma.signed_by_name) && (

@@ -5,16 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { AuthLayout } from "@/components/layout/AuthLayout";
 import { useAuth } from "@/context/AuthContext";
-import { ROLE_LABELS, SEAT_ROLES, type AppRole } from "@/constants/roles";
 import { requestPasswordReset, signIn, signUp } from "@/services/authService";
 
 function message(error: unknown): string {
@@ -27,7 +19,6 @@ export function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
-  const [role, setRole] = useState<AppRole>("qs");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -67,7 +58,7 @@ export function AuthPage() {
     e.preventDefault();
     setBusy(true);
     try {
-      const { session: created } = await signUp({ email, password, fullName, role });
+      const { session: created } = await signUp({ email, password, fullName });
       if (!created) {
         toast.success("Check your email to confirm your account.");
         return;
@@ -129,6 +120,10 @@ export function AuthPage() {
 
         <TabsContent value="signup">
           <form className="space-y-4 pt-4" onSubmit={handleSignUp}>
+            <p className="text-sm text-muted-foreground">
+              This creates a client account. UZA staff and specialists are invited by a project lead —
+              use the link in your invitation email instead.
+            </p>
             <div className="space-y-2">
               <Label htmlFor="name">Full name</Label>
               <Input
@@ -138,21 +133,6 @@ export function AuthPage() {
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="seat">Seat</Label>
-              <Select value={role} onValueChange={(v) => setRole(v as AppRole)}>
-                <SelectTrigger id="seat">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {SEAT_ROLES.map((r) => (
-                    <SelectItem key={r} value={r}>
-                      {ROLE_LABELS[r]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="email2">Email</Label>

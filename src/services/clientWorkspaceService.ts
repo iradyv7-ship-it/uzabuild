@@ -41,7 +41,7 @@ export function reviewStatusLabel(status: string | null | undefined): string {
 
 /** Formats a client may submit: drawings, models, scans and written briefs. */
 export const CLIENT_UPLOAD_ACCEPT =
-  ".pdf,.dwg,.dxf,.ifc,.rvt,.skp,.png,.jpg,.jpeg,.webp,.xlsx,.xls,.csv,.docx,.doc";
+  ".pdf,.dwg,.dxf,.ifc,.rvt,.skp,.png,.jpg,.jpeg,.webp,.heic,.heif,.tif,.tiff,.xlsx,.xlsm,.xls,.ods,.csv,.docx,.doc,.pptx";
 
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 

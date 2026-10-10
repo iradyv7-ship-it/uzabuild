@@ -13,13 +13,23 @@
  *  - proprietary binaries (DWG, RVT, RFA, SKP, NWD) -> readable strings, layer
  *    and room labels, schedule text and embedded metadata are salvaged
  *
- * Nothing is ever rejected for being "unsupported": the worst case is a
- * low-confidence takeoff built from whatever the reader could recover, and
- * every such result is marked `degraded` so it is never confused with a
- * measured sheet.
+ * Spreadsheets (XLSX/XLS/ODS/CSV/TSV) and Word/PowerPoint documents go
+ * through real parsers (office-reader.server.ts) via `readAnyDocument`, never
+ * the lossy label salvage. Image formats the model cannot take (HEIC, TIFF,
+ * BMP) and images over the API's ~5 MB limit are returned as `unsupported`
+ * with a reason a person can act on, instead of failing inside the API call.
+ * Everything else is still read somehow: the worst case is a low-confidence
+ * takeoff built from whatever the reader could recover, marked `degraded` so
+ * it is never confused with a measured sheet.
  */
+import {
+  docxToText,
+  isSpreadsheet,
+  pptxToText,
+  spreadsheetToText,
+} from "@/lib/office-reader.server";
 
-export type ReaderMode = "file" | "text";
+export type ReaderMode = "file" | "text" | "unsupported";
 
 export type ReadResult = {
   mode: ReaderMode;
@@ -28,6 +38,8 @@ export type ReadResult = {
   mimeType?: string;
   /** Only present for `text` mode. */
   text?: string;
+  /** Only present for `unsupported` mode: what the person should do instead. */
+  reason?: string;
   /** How the content was recovered, shown to the QS for transparency. */
   method: string;
   /** True when the content is a lossy salvage rather than the real sheet. */
@@ -41,11 +53,22 @@ const NATIVE_MIME: Record<string, string> = {
   jpeg: "image/jpeg",
   webp: "image/webp",
   gif: "image/gif",
-  bmp: "image/bmp",
-  tif: "image/tiff",
-  tiff: "image/tiff",
-  heic: "image/heic",
 };
+
+/** Media types the model accepts as a file block. */
+const ACCEPTED_MIME = new Set([
+  "application/pdf",
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif",
+]);
+
+/** Image formats phones and scanners produce that the model cannot take. */
+const UNREADABLE_IMAGES = new Set(["heic", "heif", "tif", "tiff", "bmp"]);
+
+/** The model rejects images above about 5 MB; check before sending. */
+export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 const TEXT_FORMATS = new Set([
   "dxf",
@@ -55,8 +78,6 @@ const TEXT_FORMATS = new Set([
   "stp",
   "svg",
   "txt",
-  "csv",
-  "tsv",
   "json",
   "xml",
   "md",
@@ -72,9 +93,7 @@ export function extensionOf(fileName: string) {
 const MAX_DIGEST_CHARS = 60_000;
 
 function clamp(text: string) {
-  return text.length > MAX_DIGEST_CHARS
-    ? `${text.slice(0, MAX_DIGEST_CHARS)}\n…(truncated)`
-    : text;
+  return text.length > MAX_DIGEST_CHARS ? `${text.slice(0, MAX_DIGEST_CHARS)}\n…(truncated)` : text;
 }
 
 function decode(bytes: Uint8Array) {
@@ -124,7 +143,11 @@ function interestingLabels(strings: string[], limit = 400) {
     if (NOISE.test(value)) continue;
     if (!/[a-z]/i.test(value)) continue;
     // Drop obvious file-format plumbing.
-    if (/^(acad|autocad|adsk|revit|schema|ifc[0-9]|http|urn:|xmlns|microsoft|windows|arial|calibri)/i.test(value))
+    if (
+      /^(acad|autocad|adsk|revit|schema|ifc[0-9]|http|urn:|xmlns|microsoft|windows|arial|calibri)/i.test(
+        value,
+      )
+    )
       continue;
     seen.set(value, (seen.get(value) ?? 0) + 1);
   }
@@ -190,7 +213,11 @@ function digestIfc(raw: string) {
 
     if (upper === "IFCSPACE" || upper === "IFCZONE" || upper === "IFCBUILDINGSTOREY") {
       if (label) spaces.push(`${upper}: ${label}`);
-    } else if (/^IFC(DOOR|WINDOW|WALL|SLAB|COVERING|FURNITURE|SANITARYTERMINAL|LIGHTFIXTURE|CURTAINWALL|STAIR|RAILING)/.test(upper)) {
+    } else if (
+      /^IFC(DOOR|WINDOW|WALL|SLAB|COVERING|FURNITURE|SANITARYTERMINAL|LIGHTFIXTURE|CURTAINWALL|STAIR|RAILING)/.test(
+        upper,
+      )
+    ) {
       if (label) products.push(`${upper}: ${label}`);
     } else if (/^IFCQUANTITY(AREA|LENGTH|VOLUME|COUNT)/.test(upper)) {
       const numbers = [...(args ?? "").matchAll(/(-?\d+\.\d+(?:E[+-]?\d+)?)/gi)].map((m) => m[1]);
@@ -220,7 +247,9 @@ function digestGenericText(raw: string) {
 /** Last-resort salvage for proprietary binaries (DWG, RVT, RFA, SKP, NWD). */
 function digestBinary(bytes: Uint8Array, ext: string) {
   const combined = interestingLabels([...asciiStrings(bytes), ...utf16Strings(bytes)], 600);
-  const versionTag = decode(bytes.subarray(0, 16)).replace(/[^\x20-\x7e]/g, "").trim();
+  const versionTag = decode(bytes.subarray(0, 16))
+    .replace(/[^\x20-\x7e]/g, "")
+    .trim();
 
   return [
     `## Container\nProprietary ${ext.toUpperCase()} file, ${bytes.length} bytes${
@@ -238,11 +267,30 @@ export function readAnyDrawing(args: {
   mimeType?: string | null;
 }): ReadResult {
   const ext = extensionOf(args.fileName);
+  if (
+    UNREADABLE_IMAGES.has(ext) ||
+    (args.mimeType && /^image\/(heic|heif|tiff|bmp)/.test(args.mimeType))
+  ) {
+    return {
+      mode: "unsupported",
+      method: `${(ext || "image").toUpperCase()} image`,
+      reason: `${(ext || "This image").toUpperCase()} images cannot be read automatically — export the page as PDF or JPG and upload that, or measure it by hand.`,
+      degraded: true,
+    };
+  }
+
   const nativeMime =
-    NATIVE_MIME[ext] ??
-    (args.mimeType && /^(image\/|application\/pdf)/.test(args.mimeType) ? args.mimeType : null);
+    NATIVE_MIME[ext] ?? (args.mimeType && ACCEPTED_MIME.has(args.mimeType) ? args.mimeType : null);
 
   if (nativeMime) {
+    if (nativeMime.startsWith("image/") && args.bytes.byteLength > MAX_IMAGE_BYTES) {
+      return {
+        mode: "unsupported",
+        method: `Image over ${MAX_IMAGE_BYTES / 1024 / 1024} MB`,
+        reason: `This image is ${(args.bytes.byteLength / 1024 / 1024).toFixed(1)} MB — the reader takes images up to 5 MB. Send a smaller photo, or the drawing as a PDF.`,
+        degraded: true,
+      };
+    }
     return {
       mode: "file",
       bytes: args.bytes,
@@ -275,4 +323,60 @@ export function readAnyDrawing(args: {
     method: `Salvaged readable labels from the ${(ext || "binary").toUpperCase()} container`,
     degraded: true,
   };
+}
+
+/**
+ * The entry point for every upload: real parsers for spreadsheets and Office
+ * documents, then the drawing reader for everything else.
+ */
+export async function readAnyDocument(args: {
+  bytes: Uint8Array;
+  fileName: string;
+  mimeType?: string | null;
+}): Promise<ReadResult> {
+  const ext = extensionOf(args.fileName);
+  try {
+    if (isSpreadsheet(ext)) {
+      const sheet = spreadsheetToText(args.bytes, args.fileName);
+      const summary = sheet.sheets.map((s) => `${s.name} (${s.included} rows)`).join(", ");
+      return {
+        mode: "text",
+        text: sheet.text,
+        method: `Parsed spreadsheet: ${summary || "no data"}${sheet.truncated ? " — truncated" : ""}`,
+        degraded: false,
+      };
+    }
+    if (ext === "docx") {
+      return {
+        mode: "text",
+        text: await docxToText(args.bytes),
+        method: "Extracted Word document text",
+        degraded: false,
+      };
+    }
+    if (ext === "pptx") {
+      return {
+        mode: "text",
+        text: await pptxToText(args.bytes),
+        method: "Extracted PowerPoint slide text",
+        degraded: false,
+      };
+    }
+  } catch (e) {
+    return {
+      mode: "unsupported",
+      method: `${ext.toUpperCase()} parse failed`,
+      reason: `This ${ext.toUpperCase()} file could not be opened (${e instanceof Error ? e.message : "unreadable"}). Re-save it and upload again.`,
+      degraded: true,
+    };
+  }
+  if (ext === "doc" || ext === "ppt") {
+    return {
+      mode: "unsupported",
+      method: `Legacy ${ext.toUpperCase()}`,
+      reason: `Old .${ext} files cannot be read automatically — save it as .${ext}x or PDF and upload that.`,
+      degraded: true,
+    };
+  }
+  return readAnyDrawing(args);
 }

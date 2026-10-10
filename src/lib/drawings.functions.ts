@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { readAnyDrawing } from "@/lib/drawing-reader.server";
+import { extensionOf, readAnyDocument } from "@/lib/drawing-reader.server";
+import { isSpreadsheet } from "@/lib/office-reader.server";
 
 /** 18 MB of source file — beyond this the model call is not reliable. */
 const MAX_BYTES = 18 * 1024 * 1024;
@@ -106,6 +107,50 @@ type Space = {
   basis: string;
 };
 
+/** Thrown by `fail()` once the drawing row already carries the reason. */
+class ReadFailure extends Error {}
+
+/** Turns an API error response into something a QS can act on. */
+async function describeApiError(response: Response): Promise<{ message: string; reason: string }> {
+  let detail = "";
+  try {
+    const body = (await response.json()) as { error?: { type?: string; message?: string } };
+    detail = body.error?.message ?? "";
+    console.error("[readDrawing] Anthropic API error", response.status, body);
+  } catch {
+    console.error("[readDrawing] Anthropic API error", response.status);
+  }
+  if (response.status === 413 || /too large|exceeds|maximum/i.test(detail)) {
+    return {
+      message:
+        "This drawing is too large for the reader in one go — split the set into smaller PDFs.",
+      reason: "Too large for a single automatic read — split the set or measure by hand.",
+    };
+  }
+  if (response.status === 429) {
+    return {
+      message: "The drawing reader is busy right now — try again in a moment.",
+      reason: "The reader was busy — try reading it again.",
+    };
+  }
+  if (response.status === 402) {
+    return {
+      message: "AI credits are exhausted.",
+      reason: "AI credits ran out before this file was read.",
+    };
+  }
+  if (response.status === 400) {
+    return {
+      message: `The reader could not accept this file${detail ? `: ${detail}` : "."}`,
+      reason: "The automatic reader rejected this file — re-export it as PDF, or measure by hand.",
+    };
+  }
+  return {
+    message: "The drawing reader could not process this file.",
+    reason: "The automatic reader could not process this file — measure by hand.",
+  };
+}
+
 function toBase64(bytes: Uint8Array): string {
   let binary = "";
   const chunk = 0x8000;
@@ -136,6 +181,12 @@ export const readDrawing = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     if (!drawing) throw new Error("That drawing is not available to you.");
 
+    if (isSpreadsheet(extensionOf(drawing.file_name))) {
+      throw new Error(
+        "This is a spreadsheet — use “Import as BOQ” to bring its lines into the BOQ.",
+      );
+    }
+
     if (drawing.size_bytes && Number(drawing.size_bytes) > MAX_BYTES) {
       throw new Error("This file is too large to read automatically — a surveyor must measure it.");
     }
@@ -145,7 +196,7 @@ export const readDrawing = createServerFn({ method: "POST" })
       .update({ status: "processing", error: null })
       .eq("id", drawing.id);
 
-    const fail = async (message: string, reason: string) => {
+    const fail = async (message: string, reason: string): Promise<never> => {
       await context.supabase
         .from("drawings")
         .update({
@@ -155,255 +206,307 @@ export const readDrawing = createServerFn({ method: "POST" })
           human_takeoff_reason: reason,
         })
         .eq("id", drawing.id);
-      throw new Error(message);
+      throw new ReadFailure(message);
     };
 
-    const file = await context.supabase.storage.from("drawings").download(drawing.storage_path);
-    if (file.error || !file.data) {
-      return fail(
-        "The stored file could not be opened.",
-        "The stored file could not be opened for automatic reading.",
-      );
-    }
+    // Every path out of a read leaves the drawing in a final state: an
+    // unexpected error (network, insert, parse) must not strand it in
+    // "processing" with no reason shown.
+    try {
+      const file = await context.supabase.storage.from("drawings").download(drawing.storage_path);
+      if (file.error || !file.data) {
+        return await fail(
+          "The stored file could not be opened.",
+          "The stored file could not be opened for automatic reading.",
+        );
+      }
 
-    const bytes = new Uint8Array(await file.data.arrayBuffer());
-    if (bytes.byteLength > MAX_BYTES) {
-      return fail(
-        "This file is too large to read automatically.",
-        "File too large for the automatic reader — measure by hand.",
-      );
-    }
+      const bytes = new Uint8Array(await file.data.arrayBuffer());
+      if (bytes.byteLength > MAX_BYTES) {
+        return await fail(
+          "This file is too large to read automatically.",
+          "File too large for the automatic reader — measure by hand.",
+        );
+      }
 
-    // Format-aware parsing step: native PDFs/images go to the vision model as
-    // a file part unchanged; DXF/IFC/STEP are parsed into a structured digest;
-    // proprietary CAD/BIM binaries (DWG, RVT, RFA, SKP, NWD) get their layer,
-    // room and schedule labels salvaged rather than being rejected outright.
-    // Either way the model sees SOMETHING and every draft still needs a QS.
-    const source = readAnyDrawing({
-      bytes,
-      fileName: drawing.file_name,
-      mimeType: drawing.file_type,
-    });
-    if (source.mode === "text" && !source.text?.trim()) {
-      return fail(
-        "Nothing readable could be recovered from this file.",
-        "The universal drawing reader found no recoverable layers, labels or text in this file — a surveyor must measure it.",
-      );
-    }
+      // Format-aware parsing step: native PDFs/images go to the vision model as
+      // a file part unchanged; DXF/IFC/STEP are parsed into a structured digest;
+      // proprietary CAD/BIM binaries (DWG, RVT, RFA, SKP, NWD) get their layer,
+      // room and schedule labels salvaged rather than being rejected outright.
+      // Either way the model sees SOMETHING and every draft still needs a QS.
+      const source = await readAnyDocument({
+        bytes,
+        fileName: drawing.file_name,
+        mimeType: drawing.file_type,
+      });
+      if (source.mode === "unsupported") {
+        const reason = source.reason ?? "This file cannot be read automatically — measure by hand.";
+        return await fail(reason, reason);
+      }
+      if (source.mode === "text" && !source.text?.trim()) {
+        return await fail(
+          "Nothing readable could be recovered from this file.",
+          "The universal drawing reader found no recoverable layers, labels or text in this file — a surveyor must measure it.",
+        );
+      }
 
-    // Anthropic splits "file" input by media type: real images are an `image` block,
-    // but a native PDF is a `document` block — the same distinction the reader's own
-    // `source.mimeType` already carries, it just wasn't visible under a single
-    // OpenAI-style `image_url` part.
-    const filePart =
-      source.mode === "file"
-        ? source.mimeType === "application/pdf"
-          ? {
-              type: "document" as const,
-              source: {
-                type: "base64" as const,
-                media_type: "application/pdf" as const,
-                data: toBase64(source.bytes!),
+      // Anthropic splits "file" input by media type: real images are an `image` block,
+      // but a native PDF is a `document` block — the same distinction the reader's own
+      // `source.mimeType` already carries, it just wasn't visible under a single
+      // OpenAI-style `image_url` part.
+      const filePart =
+        source.mode === "file"
+          ? source.mimeType === "application/pdf"
+            ? {
+                type: "document" as const,
+                source: {
+                  type: "base64" as const,
+                  media_type: "application/pdf" as const,
+                  data: toBase64(source.bytes!),
+                },
+              }
+            : {
+                type: "image" as const,
+                source: {
+                  type: "base64" as const,
+                  media_type: source.mimeType as
+                    "image/jpeg" | "image/png" | "image/gif" | "image/webp",
+                  data: toBase64(source.bytes!),
+                },
+              }
+          : null;
+
+      const userContent =
+        source.mode === "file"
+          ? [
+              {
+                type: "text" as const,
+                text: `Drawing file: ${drawing.file_name}. Record every labelled space and its openings.`,
               },
-            }
-          : {
-              type: "image" as const,
-              source: {
-                type: "base64" as const,
-                media_type: source.mimeType as
-                  "image/jpeg" | "image/png" | "image/gif" | "image/webp",
-                data: toBase64(source.bytes!),
+              filePart!,
+            ]
+          : [
+              {
+                type: "text" as const,
+                text:
+                  `Drawing file: ${drawing.file_name} — a format that cannot be rendered as an image, so this ` +
+                  `is the text recovered from it (${source.method}). Work only from labelled spaces, room names and ` +
+                  `schedule text present in the digest; if the digest carries no scale or dimension, return 0 for that ` +
+                  `figure and lower your confidence rather than guessing.\n\n${source.text}`,
               },
-            }
-        : null;
+            ];
 
-    const userContent =
-      source.mode === "file"
-        ? [
+      const response = await fetch(ANTHROPIC_MESSAGES_URL, {
+        method: "POST",
+        headers: {
+          "x-api-key": apiKey,
+          "anthropic-version": ANTHROPIC_VERSION,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: MODEL,
+          max_tokens: MAX_TOKENS,
+          system:
+            "You are a quantity surveyor reading an architectural drawing. Work only from what is printed: room labels, " +
+            "dimension strings, door and window schedules and the stated scale. Derive floor area, net wall area, " +
+            "perimeter and opening areas in metric units. If a figure cannot be derived from the drawing, return 0 " +
+            "rather than estimating it, and lower your confidence. Never invent a room that is not labelled.",
+          messages: [
             {
-              type: "text" as const,
-              text: `Drawing file: ${drawing.file_name}. Record every labelled space and its openings.`,
+              role: "user",
+              content: userContent,
             },
-            filePart!,
-          ]
-        : [
-            {
-              type: "text" as const,
-              text:
-                `Drawing file: ${drawing.file_name} — a CAD/BIM format that cannot be rendered as an image, so this ` +
-                `is a text digest recovered from it (${source.method}). Work only from labelled spaces, room names and ` +
-                `schedule text present in the digest; if the digest carries no scale or dimension, return 0 for that ` +
-                `figure and lower your confidence rather than guessing.\n\n${source.text}`,
-            },
-          ];
+          ],
+          tools: [TOOL],
+          tool_choice: { type: "tool", name: "record_takeoff" },
+        }),
+      });
 
-    const response = await fetch(ANTHROPIC_MESSAGES_URL, {
-      method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": ANTHROPIC_VERSION,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: MAX_TOKENS,
-        system:
-          "You are a quantity surveyor reading an architectural drawing. Work only from what is printed: room labels, " +
-          "dimension strings, door and window schedules and the stated scale. Derive floor area, net wall area, " +
-          "perimeter and opening areas in metric units. If a figure cannot be derived from the drawing, return 0 " +
-          "rather than estimating it, and lower your confidence. Never invent a room that is not labelled.",
-        messages: [
-          {
-            role: "user",
-            content: userContent,
-          },
-        ],
-        tools: [TOOL],
-        tool_choice: { type: "tool", name: "record_takeoff" },
-      }),
-    });
+      if (!response.ok) {
+        const { message, reason } = await describeApiError(response);
+        return await fail(message, reason);
+      }
 
-    if (response.status === 429)
-      throw new Error("The drawing reader is busy right now — try again in a moment.");
-    if (response.status === 402) throw new Error("AI credits are exhausted.");
-    if (!response.ok) {
-      return fail(
-        "The drawing reader could not process this file.",
-        "The automatic reader could not process this file — measure by hand.",
+      const json = (await response.json()) as {
+        stop_reason?: string;
+        content?: { type: string; input?: { scale_note?: string; spaces?: Space[] } }[];
+      };
+      if (json.stop_reason === "max_tokens") {
+        return await fail(
+          "This drawing set has more spaces than one read can return — split it into smaller PDFs (a few sheets each) and read each one.",
+          "Too many spaces for one read: the result was cut off. Split the set and read each part.",
+        );
+      }
+      if (json.stop_reason === "refusal") {
+        return await fail(
+          "The reader declined to read this file.",
+          "The automatic reader declined this file — measure by hand.",
+        );
+      }
+      const toolUse = json.content?.find((block) => block.type === "tool_use");
+      if (!toolUse?.input) {
+        return await fail(
+          "Nothing measurable was found on this drawing.",
+          "No labelled, dimensioned spaces were found — a surveyor must measure this drawing.",
+        );
+      }
+
+      const parsed = toolUse.input;
+      const spaces = (parsed.spaces ?? []).filter(
+        (s) => typeof s.name === "string" && s.name.trim() !== "",
       );
-    }
+      if (spaces.length === 0) {
+        return await fail(
+          "Nothing measurable was found on this drawing.",
+          "No labelled, dimensioned spaces were found — a surveyor must measure this drawing.",
+        );
+      }
 
-    const json = (await response.json()) as {
-      content?: { type: string; input?: { scale_note?: string; spaces?: Space[] } }[];
-    };
-    const toolUse = json.content?.find((block) => block.type === "tool_use");
-    if (!toolUse?.input) {
-      return fail(
-        "Nothing measurable was found on this drawing.",
-        "No labelled, dimensioned spaces were found — a surveyor must measure this drawing.",
-      );
-    }
-
-    const parsed = toolUse.input;
-    const spaces = (parsed.spaces ?? []).filter(
-      (s) => typeof s.name === "string" && s.name.trim() !== "",
-    );
-    if (spaces.length === 0) {
-      return fail(
-        "Nothing measurable was found on this drawing.",
-        "No labelled, dimensioned spaces were found — a surveyor must measure this drawing.",
-      );
-    }
-
-    const scaleNote = (parsed.scale_note ?? "").trim();
-    const aiSource = `AI read of ${drawing.file_name} (${source.method})${scaleNote ? ` · scale basis: ${scaleNote}` : " · no printed scale"}`;
-    const clamp = (n: unknown) => (Number.isFinite(n) && Number(n) > 0 ? Number(n) : 0);
-    const confidenceOf = (s: Space) => {
-      const raw = Number(s.confidence);
-      const base = Number.isFinite(raw) ? Math.min(1, Math.max(0, raw)) : 0.4;
-      // No printed scale means no trustworthy dimension, whatever the model claims.
-      // A degraded (salvaged/parsed-digest) read is capped the same way: it is
-      // provenance, not a measured sheet, however confident the model sounds.
-      const capped = scaleNote ? base : Math.min(base, 0.4);
-      return source.degraded ? Math.min(capped, 0.5) : capped;
-    };
-
-    const rows: {
-      project_id: string;
-      drawing_id: string;
-      description: string;
-      unit: string;
-      measurement_method: string;
-      material_category: string;
-      ai_quantity: number;
-      ai_confidence: number;
-      ai_source: string;
-      ai_rationale: string;
-      status: string;
-      sort_order: number;
-    }[] = [];
-
-    let order = 0;
-    for (const s of spaces) {
-      const where = [s.level.trim(), s.name.trim()].filter(Boolean).join(" · ");
-      const rationale = s.basis?.trim() || "The model gave no dimension basis for this figure.";
-      const add = (
-        label: string,
-        unit: string,
-        method: string,
-        category: string,
-        quantity: number,
-        confidence: number,
-      ) => {
-        if (quantity <= 0) return;
-        rows.push({
-          project_id: drawing.project_id,
-          drawing_id: drawing.id,
-          description: `${where} — ${label}`,
-          unit,
-          measurement_method: method,
-          material_category: category,
-          ai_quantity: quantity,
-          ai_confidence: confidence,
-          ai_source: aiSource,
-          ai_rationale: rationale,
-          status: "draft",
-          sort_order: order++,
-        });
+      const scaleNote = (parsed.scale_note ?? "").trim();
+      const aiSource = `AI read of ${drawing.file_name} (${source.method})${scaleNote ? ` · scale basis: ${scaleNote}` : " · no printed scale"}`;
+      const clamp = (n: unknown) => (Number.isFinite(n) && Number(n) > 0 ? Number(n) : 0);
+      const confidenceOf = (s: Space) => {
+        const raw = Number(s.confidence);
+        const base = Number.isFinite(raw) ? Math.min(1, Math.max(0, raw)) : 0.4;
+        // No printed scale means no trustworthy dimension, whatever the model claims.
+        // A degraded (salvaged/parsed-digest) read is capped the same way: it is
+        // provenance, not a measured sheet, however confident the model sounds.
+        const capped = scaleNote ? base : Math.min(base, 0.4);
+        return source.degraded ? Math.min(capped, 0.5) : capped;
       };
 
-      const c = confidenceOf(s);
-      add("floor area", "m2", "area", "floor", clamp(s.floor_area_m2), c);
-      add("wall area (net of openings)", "m2", "area", "wall", clamp(s.wall_area_m2), c);
-      add("perimeter", "m", "length", "skirting", clamp(s.perimeter_m), c);
-      add("doors", "no", "count", "door", clamp(s.door_count), c);
-      add("windows", "no", "count", "window", clamp(s.window_count), c);
-      add("opening area deducted", "m2", "area", "opening", clamp(s.opening_area_m2), c);
-    }
+      const rows: {
+        project_id: string;
+        drawing_id: string;
+        description: string;
+        unit: string;
+        measurement_method: string;
+        material_category: string;
+        ai_quantity: number;
+        ai_confidence: number;
+        ai_source: string;
+        ai_rationale: string;
+        status: string;
+        sort_order: number;
+      }[] = [];
 
-    if (rows.length === 0) {
-      return fail(
-        "The drawing was read but no dimension could be derived from it.",
-        "The drawing carries no usable dimensions — a surveyor must measure it.",
-      );
-    }
+      let order = 0;
+      for (const s of spaces) {
+        const where = [s.level.trim(), s.name.trim()].filter(Boolean).join(" · ");
+        const rationale = s.basis?.trim() || "The model gave no dimension basis for this figure.";
+        const add = (
+          label: string,
+          unit: string,
+          method: string,
+          category: string,
+          quantity: number,
+          confidence: number,
+        ) => {
+          if (quantity <= 0) return;
+          rows.push({
+            project_id: drawing.project_id,
+            drawing_id: drawing.id,
+            description: `${where} — ${label}`,
+            unit,
+            measurement_method: method,
+            material_category: category,
+            ai_quantity: quantity,
+            ai_confidence: confidence,
+            ai_source: aiSource,
+            ai_rationale: rationale,
+            status: "draft",
+            sort_order: order++,
+          });
+        };
 
-    const { error: insertError } = await context.supabase.from("takeoff_lines").insert(rows);
-    if (insertError) throw new Error(insertError.message);
+        const c = confidenceOf(s);
+        add("floor area", "m2", "area", "floor", clamp(s.floor_area_m2), c);
+        add("wall area (net of openings)", "m2", "area", "wall", clamp(s.wall_area_m2), c);
+        add("perimeter", "m", "length", "skirting", clamp(s.perimeter_m), c);
+        add("doors", "no", "count", "door", clamp(s.door_count), c);
+        add("windows", "no", "count", "window", clamp(s.window_count), c);
+        add("opening area deducted", "m2", "area", "opening", clamp(s.opening_area_m2), c);
+      }
 
-    // A salvaged/parsed CAD-BIM digest always goes back to a human, on top of
-    // the existing no-printed-scale rule — it is provenance recovered from a
-    // container, never a measured sheet.
-    const needsHuman = !scaleNote || source.degraded;
-    await context.supabase
-      .from("drawings")
-      .update({
-        status: "extracted",
-        error: null,
-        extraction: {
-          scale_note: scaleNote,
-          spaces,
-          read_at: new Date().toISOString(),
+      if (rows.length === 0) {
+        return await fail(
+          "The drawing was read but no dimension could be derived from it.",
+          "The drawing carries no usable dimensions — a surveyor must measure it.",
+        );
+      }
+
+      // "Read again" replaces this drawing's unreviewed drafts instead of
+      // stacking a second copy of every line. Reviewed lines (accepted or
+      // corrected by a QS) are never touched.
+      const { error: clearError } = await context.supabase
+        .from("takeoff_lines")
+        .delete()
+        .eq("drawing_id", drawing.id)
+        .eq("status", "draft");
+      if (clearError) {
+        return await fail(
+          `Earlier draft lines could not be replaced: ${clearError.message}`,
+          "The earlier read's draft lines could not be replaced — try again.",
+        );
+      }
+
+      const { error: insertError } = await context.supabase.from("takeoff_lines").insert(rows);
+      if (insertError) {
+        return await fail(
+          `The takeoff lines could not be saved: ${insertError.message}`,
+          "The read finished but its lines could not be saved — try again.",
+        );
+      }
+
+      // A salvaged/parsed CAD-BIM digest always goes back to a human, on top of
+      // the existing no-printed-scale rule — it is provenance recovered from a
+      // container, never a measured sheet.
+      const needsHuman = !scaleNote || source.degraded;
+      await context.supabase
+        .from("drawings")
+        .update({
+          status: "extracted",
+          error: null,
+          extraction: {
+            scale_note: scaleNote,
+            spaces,
+            read_at: new Date().toISOString(),
+            read_method: source.method,
+            degraded: source.degraded,
+          },
           read_method: source.method,
           degraded: source.degraded,
-        },
-        read_method: source.method,
-        degraded: source.degraded,
-        requires_human_takeoff: needsHuman,
-        human_takeoff_reason: needsHuman
-          ? source.degraded
-            ? `Read via ${source.method} — a salvaged/parsed digest, not a measured sheet. A surveyor must confirm every quantity against the real drawing.`
-            : "No printed scale was found, so every quantity read from this drawing must be confirmed against real dimensions."
-          : null,
-      })
-      .eq("id", drawing.id);
+          requires_human_takeoff: needsHuman,
+          human_takeoff_reason: needsHuman
+            ? source.degraded
+              ? `Read via ${source.method} — a salvaged/parsed digest, not a measured sheet. A surveyor must confirm every quantity against the real drawing.`
+              : "No printed scale was found, so every quantity read from this drawing must be confirmed against real dimensions."
+            : null,
+        })
+        .eq("id", drawing.id);
 
-    return {
-      spaces: spaces.length,
-      lines: rows.length,
-      scaleNote,
-      needsHuman,
-      method: source.method,
-      degraded: source.degraded,
-    };
+      return {
+        spaces: spaces.length,
+        lines: rows.length,
+        scaleNote,
+        needsHuman,
+        method: source.method,
+        degraded: source.degraded,
+      };
+    } catch (e) {
+      if (e instanceof ReadFailure) throw new Error(e.message);
+      const message = e instanceof Error ? e.message : "The drawing could not be read.";
+      console.error("[readDrawing] unexpected failure", e);
+      await context.supabase
+        .from("drawings")
+        .update({
+          status: "failed",
+          error: message,
+          requires_human_takeoff: true,
+          human_takeoff_reason:
+            "The automatic read stopped with an error — try again, or measure by hand.",
+        })
+        .eq("id", drawing.id);
+      throw new Error(`The drawing could not be read: ${message}`);
+    }
   });

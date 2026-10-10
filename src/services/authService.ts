@@ -29,15 +29,15 @@ export async function signUp(input: {
   email: string;
   password: string;
   fullName: string;
-  role: AppRole;
 }): Promise<{ session: Session | null }> {
   const { data, error } = await supabase.auth.signUp({
     email: input.email.trim().toLowerCase(),
     password: input.password,
     options: {
       emailRedirectTo: window.location.origin,
-      // Requested seat only. The database decides what is actually granted.
-      data: { full_name: input.fullName.trim(), role: input.role },
+      // Self sign-up is always a client account; staff seats come only from an
+      // invitation (handle_new_user ignores any other requested role).
+      data: { full_name: input.fullName.trim(), role: "client" },
     },
   });
   if (error) fail(error.message);

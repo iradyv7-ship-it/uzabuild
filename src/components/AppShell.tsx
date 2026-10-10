@@ -28,8 +28,9 @@ const NAV = [
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { fullName, roles, user, signOut, isCostBlind } = useAuth();
-  const nav = isCostBlind ? CLIENT_NAV : NAV;
+  const { fullName, roles, user, signOut, isCostBlind, rolesLoading } = useAuth();
+  // No menu until we know the seat — otherwise a client briefly sees the staff app.
+  const nav = rolesLoading ? [] : isCostBlind ? CLIENT_NAV : NAV;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const pathname = useRouterState({ select: (s) => s.location.pathname });

@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { QueryState, EmptyState } from "@/components/DataState";
-import { formatMoney, roundClientTotal, toMinor } from "@/lib/pricing";
+import { formatMoney, roundClientTotal, toMajor, toMinor } from "@/lib/pricing";
 import type { CurrencyCode } from "@/config/policy";
 import { useAuth } from "@/context/AuthContext";
 
@@ -175,10 +175,20 @@ function NewProposalDialog({
   const [title, setTitle] = useState(`${projectName} — finishing solution`);
   const [summary, setSummary] = useState("");
   const [scope, setScope] = useState("");
-  const [price, setPrice] = useState(String(roundClientTotal(suggestedPriceMinor, currency)));
+  // The field holds MAJOR units (what a person types); it is converted to
+  // minor units exactly once, on save.
+  const suggestedMajor = () => String(toMajor(roundClientTotal(suggestedPriceMinor, currency), currency));
+  const [price, setPrice] = useState(suggestedMajor);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        // Re-seed from the BOQ as it is now, not as it was when the page loaded.
+        if (next) setPrice(suggestedMajor());
+        setOpen(next);
+      }}
+    >
       <DialogTrigger asChild>
         <Button size="sm">Draft proposal</Button>
       </DialogTrigger>

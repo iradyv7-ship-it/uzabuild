@@ -108,7 +108,7 @@ export function ClientSubmissions({ projectId }: { projectId: string }) {
               <FileUp className="size-4" aria-hidden /> Choose files
             </Button>
             <span className="text-xs text-muted-foreground">
-              PDF, DWG, DXF, IFC, RVT, SKP, images, Excel or Word — up to 100 MB each.
+              PDF, DWG, DXF, IFC, RVT, SKP, photos, Excel, Word or PowerPoint — up to 100 MB each.
             </span>
           </div>
           {pending.length > 0 && (

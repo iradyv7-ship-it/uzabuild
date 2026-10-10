@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { ArrowLeft, Plus, Trash2, Download, FileCheck2 } from "lucide-react";
@@ -74,8 +74,26 @@ export const Route = createFileRoute("/_authenticated/projects_/$projectId")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
+  validateSearch: (search: Record<string, unknown>): { tab?: string | undefined } => ({
+    tab: typeof search["tab"] === "string" ? search["tab"] : undefined,
+  }),
   component: ProjectBoq,
 });
+
+/**
+ * Where each seat starts on a project: the tab holding the work it owns.
+ * Everything else is one click away; the open tab is kept in the URL so a
+ * link (e.g. from the sourcing desk) can open a project on a specific tab.
+ */
+function defaultTabFor(roles: AppRole[], isCostBlind: boolean): string {
+  if (isCostBlind) return "proposal";
+  if (roles.includes("admin") || roles.includes("project_manager")) return "overview";
+  if (roles.includes("qs")) return "takeoff";
+  if (roles.includes("interior_designer")) return "client-board";
+  if (roles.includes("architect") || roles.includes("mep_engineer")) return "documents";
+  if (roles.includes("china_sourcing") || roles.includes("procurement")) return "packages";
+  return "overview";
+}
 
 type Line = {
   id: string;
@@ -95,6 +113,8 @@ function ProjectBoq() {
   const { projectId } = Route.useParams();
   const queryClient = useQueryClient();
   const { user, roles, fullName, isCostBlind } = useAuth();
+  const { tab } = Route.useSearch();
+  const navigate = useNavigate({ from: Route.fullPath });
   const [openRoom, setOpenRoom] = useState<string | null>(null);
 
   const { data: project } = useQuery({
@@ -174,18 +194,17 @@ function ProjectBoq() {
       return data as unknown as Line[];
     },
   });
+  // Every item, active or not: a line keeps its price when its item is later
+  // deactivated. Pickers only offer active items (activeCatalog).
   const { data: catalog = [] } = useQuery({
     queryKey: ["catalog-items"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("catalog_items")
-        .select("*")
-        .eq("is_active", true)
-        .order("name");
+      const { data, error } = await supabase.from("catalog_items").select("*").order("name");
       if (error) throw error;
       return data;
     },
   });
+  const activeCatalog = useMemo(() => catalog.filter((c) => c.is_active), [catalog]);
   const currency = (project?.currency ?? "RWF") as Currency;
 
   const rateFor = (line: Line) => {
@@ -254,6 +273,20 @@ function ProjectBoq() {
           measurement_method: v.measurement_method ?? "area",
           measurement_note: v.measurement_note ?? null,
         })
+        .eq("id", v.id);
+      if (error) throw error;
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["boq-lines", projectId] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  /** Price a line that arrived without a catalog item (takeoff or spreadsheet import). */
+  const setLineItem = useMutation({
+    mutationFn: async (v: { id: string; itemId: string }) => {
+      const item = catalog.find((c) => c.id === v.itemId);
+      const { error } = await supabase
+        .from("boq_lines")
+        .update({ catalog_item_id: v.itemId, ...(item ? { unit: item.unit } : {}) })
         .eq("id", v.id);
       if (error) throw error;
     },
@@ -440,7 +473,11 @@ function ProjectBoq() {
         </div>
       </div>
 
-      <Tabs defaultValue={isCostBlind ? "proposal" : "overview"} className="space-y-6">
+      <Tabs
+        value={tab ?? defaultTabFor(roles, isCostBlind)}
+        onValueChange={(next) => void navigate({ search: { tab: next }, replace: true })}
+        className="space-y-6"
+      >
         <TabsList className="flex h-auto w-full flex-wrap justify-start">
           {!isCostBlind && <TabsTrigger value="overview">Overview</TabsTrigger>}
           {!isCostBlind && <TabsTrigger value="discovery">Client brief</TabsTrigger>}
@@ -682,7 +719,9 @@ function ProjectBoq() {
                                             line={l}
                                             rate={rateFor(l)}
                                             currency={currency}
+                                            catalog={activeCatalog}
                                             onSave={(v) => saveLine.mutate({ id: l.id, ...v })}
+                                            onChooseItem={(itemId) => setLineItem.mutate({ id: l.id, itemId })}
                                             onDelete={() => deleteLine.mutate(l.id)}
                                           />
                                         ))}
@@ -699,7 +738,7 @@ function ProjectBoq() {
                                       </TableBody>
                                     </Table>
                                     <AddLineDialog
-                                      catalog={catalog}
+                                      catalog={activeCatalog}
                                       roomArea={num(r.floor_area_m2)}
                                       onSubmit={(v) => addLine.mutate({ roomId: r.id, ...v })}
                                     />
@@ -730,13 +769,17 @@ function LineRow({
   line,
   rate,
   currency,
+  catalog,
   onSave,
+  onChooseItem,
   onDelete,
 }: {
   itemNo: string;
   line: Line;
   rate: number;
   currency: Currency;
+  catalog: { id: string; name: string; unit: string }[];
+  onChooseItem: (itemId: string) => void;
   onSave: (v: {
     base_quantity: number;
     wastage_pct: number;
@@ -768,6 +811,20 @@ function LineRow({
           {line.unit}
           {line.measurement_note ? ` · ${line.measurement_note}` : ""}
         </p>
+        {!line.catalog_item_id && (line.pinned_rate === null || line.pinned_rate === undefined) && (
+          <Select onValueChange={onChooseItem}>
+            <SelectTrigger className="mt-1 h-8 w-full max-w-64 border-dashed text-xs">
+              <SelectValue placeholder="Unpriced — choose a catalog item" />
+            </SelectTrigger>
+            <SelectContent>
+              {catalog.map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.name} ({c.unit})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </TableCell>
       <TableCell>
         <Select

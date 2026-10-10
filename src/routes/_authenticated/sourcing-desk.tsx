@@ -99,7 +99,7 @@ function SourcingDesk() {
                   <div className="flex items-center gap-2">
                     <Badge variant="outline">{p.status === "draft" ? "Draft" : p.status}</Badge>
                     <Button asChild size="sm" variant="outline">
-                      <Link to="/projects/$projectId" params={{ projectId: p.project_id }}>
+                      <Link to="/projects/$projectId" params={{ projectId: p.project_id }} search={{ tab: "proforma" }}>
                         Open
                       </Link>
                     </Button>
@@ -141,7 +141,7 @@ function SourcingDesk() {
                   <div className="flex items-center gap-2">
                     <Badge variant="secondary">{packageStatusLabel(pkg.status)}</Badge>
                     <Button asChild size="sm" variant="outline">
-                      <Link to="/projects/$projectId" params={{ projectId: pkg.project_id }}>
+                      <Link to="/projects/$projectId" params={{ projectId: pkg.project_id }} search={{ tab: "packages" }}>
                         Open
                       </Link>
                     </Button>

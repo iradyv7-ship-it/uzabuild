@@ -19,6 +19,8 @@ type AuthValue = {
   roles: AppRole[];
   fullName: string;
   loading: boolean;
+  /** True while a signed-in user's roles are still being fetched. */
+  rolesLoading: boolean;
   hasRole: (role: AppRole) => boolean;
   /** Clients never see cost build-up, margin or the catalog cost base. */
   isCostBlind: boolean;
@@ -32,6 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(true);
+  const [rolesFor, setRolesFor] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = onSessionChange((next) => {
@@ -57,6 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (cancelled) return;
       setRoles(nextRoles);
       setFullName(name);
+      setRolesFor(userId);
     })();
     return () => {
       cancelled = true;
@@ -69,6 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     roles,
     fullName,
     loading,
+    rolesLoading: Boolean(userId) && rolesFor !== userId,
     hasRole: (role) => roles.includes(role),
     isCostBlind: roles.length > 0 && roles.every((r) => r === "client"),
     signOut: signOutRequest,
