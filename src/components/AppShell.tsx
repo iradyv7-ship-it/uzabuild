@@ -1,7 +1,7 @@
 import { Link, Navigate, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { LayoutDashboard, Package, FolderKanban, SlidersHorizontal, LogOut, HardHat, Brain, Building2, LifeBuoy, Factory, ClipboardList } from "lucide-react";
+import { LayoutDashboard, Package, FolderKanban, SlidersHorizontal, LogOut, HardHat, Brain, Building2, LifeBuoy, Factory, ClipboardList, Images } from "lucide-react";
 import { useEffect, type ReactNode } from "react";
 import { acceptMyInvitations } from "@/lib/invitations.functions";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ const NAV = [
   { to: "/sourcing", label: "Sourcing Board", icon: ClipboardList },
   { to: "/manufacturers", label: "Manufacturers", icon: Factory },
   { to: "/learning", label: "Takeoff Accuracy", icon: Brain },
+  { to: "/portfolio-admin", label: "Portfolio", icon: Images },
   { to: "/settings", label: "Settings", icon: SlidersHorizontal },
 ];
 

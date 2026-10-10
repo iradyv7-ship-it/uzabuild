@@ -129,7 +129,7 @@ export function SiteShell({ children }: { children: ReactNode }) {
 }
 
 /** Small caps rule used to open every section. */
-export function SectionLabel({ index, children }: { index?: string; children: ReactNode }) {
+export function SectionLabel({ index, children }: { index?: string | undefined; children: ReactNode }) {
   return (
     <div className="flex items-baseline gap-3 border-t border-border pt-4">
       {index && <span className="font-mono text-[10px] tabular text-primary">{index}</span>}

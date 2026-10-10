@@ -12,15 +12,20 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as CapabilitiesRouteImport } from './routes/capabilities'
+import { Route as StartRouteImport } from './routes/start'
 import { Route as AuthenticatedCatalogRouteImport } from './routes/_authenticated/catalog'
 import { Route as AuthenticatedClientsRouteImport } from './routes/_authenticated/clients'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedLearningRouteImport } from './routes/_authenticated/learning'
 import { Route as AuthenticatedManufacturersRouteImport } from './routes/_authenticated/manufacturers'
+import { Route as AuthenticatedPortfolioAdminRouteImport } from './routes/_authenticated/portfolio-admin'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedSourcingRouteImport } from './routes/_authenticated/sourcing'
 import { Route as AuthenticatedSourcingDeskRouteImport } from './routes/_authenticated/sourcing-desk'
 import { Route as AuthResetRouteImport } from './routes/auth.reset'
+import { Route as PortfolioIndexRouteImport } from './routes/portfolio.index'
+import { Route as PortfolioSlugRouteImport } from './routes/portfolio.$slug'
 import { Route as AuthenticatedPortalIndexRouteImport } from './routes/_authenticated/portal.index'
 import { Route as AuthenticatedPortalProjectIdRouteImport } from './routes/_authenticated/portal.$projectId'
 import { Route as AuthenticatedProjectsIndexRouteImport } from './routes/_authenticated/projects.index'
@@ -38,6 +43,16 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CapabilitiesRoute = CapabilitiesRouteImport.update({
+  id: '/capabilities',
+  path: '/capabilities',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StartRoute = StartRouteImport.update({
+  id: '/start',
+  path: '/start',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedCatalogRoute = AuthenticatedCatalogRouteImport.update({
@@ -66,6 +81,12 @@ const AuthenticatedManufacturersRoute =
     path: '/manufacturers',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedPortfolioAdminRoute =
+  AuthenticatedPortfolioAdminRouteImport.update({
+    id: '/portfolio-admin',
+    path: '/portfolio-admin',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -86,6 +107,16 @@ const AuthResetRoute = AuthResetRouteImport.update({
   id: '/reset',
   path: '/reset',
   getParentRoute: () => AuthRoute,
+} as any)
+const PortfolioIndexRoute = PortfolioIndexRouteImport.update({
+  id: '/portfolio/',
+  path: '/portfolio/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PortfolioSlugRoute = PortfolioSlugRouteImport.update({
+  id: '/portfolio/$slug',
+  path: '/portfolio/$slug',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedPortalIndexRoute =
   AuthenticatedPortalIndexRouteImport.update({
@@ -115,15 +146,20 @@ const AuthenticatedProjectsProjectIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRouteWithChildren
+  '/capabilities': typeof CapabilitiesRoute
+  '/start': typeof StartRoute
   '/catalog': typeof AuthenticatedCatalogRoute
   '/clients': typeof AuthenticatedClientsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/learning': typeof AuthenticatedLearningRoute
   '/manufacturers': typeof AuthenticatedManufacturersRoute
+  '/portfolio-admin': typeof AuthenticatedPortfolioAdminRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/sourcing': typeof AuthenticatedSourcingRoute
   '/sourcing-desk': typeof AuthenticatedSourcingDeskRoute
   '/auth/reset': typeof AuthResetRoute
+  '/portfolio/$slug': typeof PortfolioSlugRoute
+  '/portfolio/': typeof PortfolioIndexRoute
   '/portal/$projectId': typeof AuthenticatedPortalProjectIdRoute
   '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/portal/': typeof AuthenticatedPortalIndexRoute
@@ -132,15 +168,20 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRouteWithChildren
+  '/capabilities': typeof CapabilitiesRoute
+  '/start': typeof StartRoute
   '/catalog': typeof AuthenticatedCatalogRoute
   '/clients': typeof AuthenticatedClientsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/learning': typeof AuthenticatedLearningRoute
   '/manufacturers': typeof AuthenticatedManufacturersRoute
+  '/portfolio-admin': typeof AuthenticatedPortfolioAdminRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/sourcing': typeof AuthenticatedSourcingRoute
   '/sourcing-desk': typeof AuthenticatedSourcingDeskRoute
   '/auth/reset': typeof AuthResetRoute
+  '/portfolio/$slug': typeof PortfolioSlugRoute
+  '/portfolio': typeof PortfolioIndexRoute
   '/portal/$projectId': typeof AuthenticatedPortalProjectIdRoute
   '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/portal': typeof AuthenticatedPortalIndexRoute
@@ -151,15 +192,20 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRouteWithChildren
+  '/capabilities': typeof CapabilitiesRoute
+  '/start': typeof StartRoute
   '/_authenticated/catalog': typeof AuthenticatedCatalogRoute
   '/_authenticated/clients': typeof AuthenticatedClientsRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/learning': typeof AuthenticatedLearningRoute
   '/_authenticated/manufacturers': typeof AuthenticatedManufacturersRoute
+  '/_authenticated/portfolio-admin': typeof AuthenticatedPortfolioAdminRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/sourcing': typeof AuthenticatedSourcingRoute
   '/_authenticated/sourcing-desk': typeof AuthenticatedSourcingDeskRoute
   '/auth/reset': typeof AuthResetRoute
+  '/portfolio/$slug': typeof PortfolioSlugRoute
+  '/portfolio/': typeof PortfolioIndexRoute
   '/_authenticated/portal/$projectId': typeof AuthenticatedPortalProjectIdRoute
   '/_authenticated/projects_/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/_authenticated/portal/': typeof AuthenticatedPortalIndexRoute
@@ -170,15 +216,20 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/capabilities'
+    | '/start'
     | '/catalog'
     | '/clients'
     | '/dashboard'
     | '/learning'
     | '/manufacturers'
+    | '/portfolio-admin'
     | '/settings'
     | '/sourcing'
     | '/sourcing-desk'
     | '/auth/reset'
+    | '/portfolio/$slug'
+    | '/portfolio/'
     | '/portal/$projectId'
     | '/projects/$projectId'
     | '/portal/'
@@ -187,15 +238,20 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/auth'
+    | '/capabilities'
+    | '/start'
     | '/catalog'
     | '/clients'
     | '/dashboard'
     | '/learning'
     | '/manufacturers'
+    | '/portfolio-admin'
     | '/settings'
     | '/sourcing'
     | '/sourcing-desk'
     | '/auth/reset'
+    | '/portfolio/$slug'
+    | '/portfolio'
     | '/portal/$projectId'
     | '/projects/$projectId'
     | '/portal'
@@ -205,15 +261,20 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/auth'
+    | '/capabilities'
+    | '/start'
     | '/_authenticated/catalog'
     | '/_authenticated/clients'
     | '/_authenticated/dashboard'
     | '/_authenticated/learning'
     | '/_authenticated/manufacturers'
+    | '/_authenticated/portfolio-admin'
     | '/_authenticated/settings'
     | '/_authenticated/sourcing'
     | '/_authenticated/sourcing-desk'
     | '/auth/reset'
+    | '/portfolio/$slug'
+    | '/portfolio/'
     | '/_authenticated/portal/$projectId'
     | '/_authenticated/projects_/$projectId'
     | '/_authenticated/portal/'
@@ -224,6 +285,10 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRouteWithChildren
+  CapabilitiesRoute: typeof CapabilitiesRoute
+  StartRoute: typeof StartRoute
+  PortfolioSlugRoute: typeof PortfolioSlugRoute
+  PortfolioIndexRoute: typeof PortfolioIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -247,6 +312,20 @@ declare module '@tanstack/react-router' {
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/capabilities': {
+      id: '/capabilities'
+      path: '/capabilities'
+      fullPath: '/capabilities'
+      preLoaderRoute: typeof CapabilitiesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/start': {
+      id: '/start'
+      path: '/start'
+      fullPath: '/start'
+      preLoaderRoute: typeof StartRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/catalog': {
@@ -284,6 +363,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedManufacturersRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/portfolio-admin': {
+      id: '/_authenticated/portfolio-admin'
+      path: '/portfolio-admin'
+      fullPath: '/portfolio-admin'
+      preLoaderRoute: typeof AuthenticatedPortfolioAdminRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/settings': {
       id: '/_authenticated/settings'
       path: '/settings'
@@ -311,6 +397,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/auth/reset'
       preLoaderRoute: typeof AuthResetRouteImport
       parentRoute: typeof AuthRoute
+    }
+    '/portfolio/': {
+      id: '/portfolio/'
+      path: '/portfolio'
+      fullPath: '/portfolio/'
+      preLoaderRoute: typeof PortfolioIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/portfolio/$slug': {
+      id: '/portfolio/$slug'
+      path: '/portfolio/$slug'
+      fullPath: '/portfolio/$slug'
+      preLoaderRoute: typeof PortfolioSlugRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/portal/': {
       id: '/_authenticated/portal/'
@@ -349,6 +449,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedLearningRoute: typeof AuthenticatedLearningRoute
   AuthenticatedManufacturersRoute: typeof AuthenticatedManufacturersRoute
+  AuthenticatedPortfolioAdminRoute: typeof AuthenticatedPortfolioAdminRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedSourcingRoute: typeof AuthenticatedSourcingRoute
   AuthenticatedSourcingDeskRoute: typeof AuthenticatedSourcingDeskRoute
@@ -364,6 +465,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedLearningRoute: AuthenticatedLearningRoute,
   AuthenticatedManufacturersRoute: AuthenticatedManufacturersRoute,
+  AuthenticatedPortfolioAdminRoute: AuthenticatedPortfolioAdminRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedSourcingRoute: AuthenticatedSourcingRoute,
   AuthenticatedSourcingDeskRoute: AuthenticatedSourcingDeskRoute,
@@ -390,6 +492,10 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRouteWithChildren,
+  CapabilitiesRoute: CapabilitiesRoute,
+  StartRoute: StartRoute,
+  PortfolioSlugRoute: PortfolioSlugRoute,
+  PortfolioIndexRoute: PortfolioIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
