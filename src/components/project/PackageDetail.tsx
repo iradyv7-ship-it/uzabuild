@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Download, FileUp, Paperclip, Trash2, Factory, AlertTriangle, UserPlus, Languages } from "lucide-react";
+import { Download, FileUp, Paperclip, Trash2, Factory, AlertTriangle, UserPlus, Languages, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +28,7 @@ import { EmptyState } from "@/components/DataState";
 import { useAuth } from "@/context/AuthContext";
 import { inviteManufacturer } from "@/lib/invitations.functions";
 import { RfqDraftDialog } from "@/components/project/RfqDraftDialog";
+import { QuoteComparison } from "@/components/project/QuoteComparison";
 import {
   ATTACHMENT_KINDS,
   MANUFACTURER_STATUSES,
@@ -52,6 +53,7 @@ import {
   type SupplierCoverage,
   deleteAttachment,
   removeManufacturer,
+  setAttachmentShared,
   setManufacturerCommitment,
   setManufacturerStatus,
   shortlistManufacturer,
@@ -173,6 +175,57 @@ export function PackageDetail({
   });
 
   const mine = manufacturers.filter((m) => m.package_id === pkg.id);
+  const supplierNames: Record<string, string> = Object.fromEntries(
+    coverage.filter((c) => c.suppliers).map((c) => [c.supplier_id, c.suppliers!.name] as const),
+  );
+
+  const share = useMutation({
+    mutationFn: (v: { id: string; shared: boolean }) => setAttachmentShared(v.id, v.shared),
+    onSuccess: (_d, v) => {
+      toast.success(
+        v.shared
+          ? "Released. Factories that were sent the RFQ can now open this file."
+          : "Withdrawn from the factories.",
+      );
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  /**
+   * Who can see a file on the factory side. A factory's own upload stays
+   * between UZA and that factory; a general file reaches the factories only
+   * once someone has checked it for the client's name and released it.
+   */
+  function factoryVisibility(f: PackageAttachment) {
+    if (f.uploaded_for_supplier_id) {
+      return (
+        <Badge variant="outline" className="gap-1">
+          <Factory className="size-3" aria-hidden /> From {supplierNames[f.uploaded_for_supplier_id] ?? "a factory"}
+        </Badge>
+      );
+    }
+    return (
+      <Button
+        variant={f.shared_with_manufacturers ? "secondary" : "outline"}
+        size="sm"
+        className="h-7 gap-1 px-2 text-xs"
+        disabled={share.isPending}
+        title="Title blocks, logos and the file name are visible to the factory — check them before releasing."
+        onClick={() => share.mutate({ id: f.id, shared: !f.shared_with_manufacturers })}
+      >
+        {f.shared_with_manufacturers ? (
+          <>
+            <Eye className="size-3.5" aria-hidden /> Released to factories · 已发送给工厂
+          </>
+        ) : (
+          <>
+            <EyeOff className="size-3.5" aria-hidden /> Not released · release to factories
+          </>
+        )}
+      </Button>
+    );
+  }
   const myAttachments = attachments.filter((a) => a.package_id === pkg.id);
   const eligible = coverage.filter(
     (c) =>
@@ -428,6 +481,7 @@ export function PackageDetail({
                           <span className="truncate">{f.file_name}</span>
                         </span>
                         <span className="flex shrink-0 items-center gap-1">
+                          {factoryVisibility(f)}
                           <Button variant="ghost" size="sm" onClick={() => void openFile(f.storage_path)}>
                             <Download className="size-4" aria-hidden />
                             <span className="sr-only">Open {f.file_name}</span>
@@ -460,7 +514,9 @@ export function PackageDetail({
           <div>
             <CardTitle className="text-base">Package file room</CardTitle>
             <CardDescription>
-              Renderings, samples and anything else that belongs to this package.
+              Renderings, samples and anything else that belongs to this package. Nothing reaches a
+              factory until you release it — check title blocks, logos and file names for the
+              client&apos;s name first.
             </CardDescription>
           </div>
           <div className="flex items-center gap-2">
@@ -508,6 +564,7 @@ export function PackageDetail({
                       <span className="truncate">{f.file_name}</span>
                     </span>
                     <span className="flex shrink-0 items-center gap-1">
+                      {factoryVisibility(f)}
                       <Button variant="ghost" size="sm" onClick={() => void openFile(f.storage_path)}>
                         <Download className="size-4" aria-hidden />
                         <span className="sr-only">Open {f.file_name}</span>
@@ -534,13 +591,10 @@ export function PackageDetail({
       {rfqOpen && (
         <RfqDraftDialog
           packageId={pkg.id}
+          projectId={projectId}
           packageTitle={pkg.title}
           manufacturers={mine}
-          supplierNames={Object.fromEntries(
-            coverage
-              .filter((c) => c.suppliers)
-              .map((c) => [c.supplier_id, c.suppliers!.name] as const),
-          )}
+          supplierNames={supplierNames}
           onClose={() => setRfqOpen(false)}
           onStatusChanged={invalidate}
         />
@@ -653,6 +707,13 @@ export function PackageDetail({
           )}
         </CardContent>
       </Card>
+
+      <QuoteComparison
+        pkg={pkg}
+        projectId={projectId}
+        manufacturers={mine}
+        supplierNames={supplierNames}
+      />
 
       <Dialog open={inviteTarget !== null} onOpenChange={(open) => !open && setInviteTarget(null)}>
         <DialogContent>

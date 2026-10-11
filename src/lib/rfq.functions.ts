@@ -41,6 +41,8 @@ export type RfqDraftResult = {
   chinese: string;
   warnings: string[];
   scheduleLines: number;
+  /** The quantity schedule as sent — stored on package_rfqs so quotes can be matched to it. */
+  schedule: { item: string; description: string; unit: string; quantity: number }[];
 };
 
 async function polish(system: string, user: string): Promise<{ text: string; truncated: boolean }> {
@@ -122,7 +124,7 @@ export const draftPackageRfq = createServerFn({ method: "POST" })
           .eq("package_id", data.packageId),
         db
           .from("package_attachments")
-          .select("kind, mime_type, uploaded_for_supplier_id")
+          .select("kind, mime_type, uploaded_for_supplier_id, shared_with_manufacturers")
           .eq("package_id", data.packageId),
         db
           .from("package_manufacturers")
@@ -212,10 +214,14 @@ export const draftPackageRfq = createServerFn({ method: "POST" })
       };
     });
 
-    // A file uploaded for one specific factory is not part of everyone's RFQ.
+    // Only files a person has released to factories are part of the RFQ —
+    // a factory cannot open anything else, so the RFQ must not promise it.
     const sharedAttachments = (attachments.data ?? []).filter(
-      (a) => a.uploaded_for_supplier_id === null || a.uploaded_for_supplier_id === data.supplierId,
+      (a) => a.uploaded_for_supplier_id === null && a.shared_with_manufacturers,
     );
+    const unreleased = (attachments.data ?? []).filter(
+      (a) => a.uploaded_for_supplier_id === null && !a.shared_with_manufacturers,
+    ).length;
 
     const draft = buildRfq({
       pkg,
@@ -248,6 +254,11 @@ export const draftPackageRfq = createServerFn({ method: "POST" })
       (descriptions || "(none)");
 
     const warnings = [...draft.warnings];
+    if (unreleased > 0) {
+      warnings.push(
+        `${unreleased} package file(s) are not released to factories yet, so they are not mentioned. Check each one for the client's name or title block, then release it in the package file room.`,
+      );
+    }
     let english = insertSchedule(draft.body, englishSchedule).text;
     let chinese = "";
 
@@ -306,5 +317,11 @@ export const draftPackageRfq = createServerFn({ method: "POST" })
       chinese,
       warnings,
       scheduleLines: draft.schedule.length,
+      schedule: draft.schedule.map((r) => ({
+        item: r.item,
+        description: r.description,
+        unit: r.unit,
+        quantity: r.quantity,
+      })),
     };
   });

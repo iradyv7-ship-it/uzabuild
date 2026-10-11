@@ -22,7 +22,11 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { draftPackageRfq, type RfqDraftResult } from "@/lib/rfq.functions";
-import { setManufacturerStatus, type PackageManufacturer } from "@/services/packageService";
+import {
+  recordRfqsSent,
+  setManufacturerStatus,
+  type PackageManufacturer,
+} from "@/services/packageService";
 
 const GENERIC = "__all__";
 
@@ -30,11 +34,13 @@ const GENERIC = "__all__";
  * One click from a package to a ready-to-send RFQ in English and Chinese.
  * The schedule comes from the BOQ; the client, project, money and rival
  * factories are stripped before anything is drafted (src/lib/rfq.ts).
- * Nothing is sent from here — the team copies it into email or WeChat and
- * marks the factories as "RFQ sent".
+ * Nothing is emailed from here — the team copies it into email or WeChat and
+ * marks the factories as "RFQ sent", which records the exact text each one
+ * received and opens the package in that factory's workspace.
  */
 export function RfqDraftDialog({
   packageId,
+  projectId,
   packageTitle,
   manufacturers,
   supplierNames,
@@ -42,6 +48,7 @@ export function RfqDraftDialog({
   onStatusChanged,
 }: {
   packageId: string;
+  projectId: string;
   packageTitle: string;
   manufacturers: PackageManufacturer[];
   supplierNames: Record<string, string>;
@@ -69,14 +76,32 @@ export function RfqDraftDialog({
 
   const markSent = useMutation({
     mutationFn: async () => {
-      for (const id of sentTo) await setManufacturerStatus(id, "rfq_sent");
+      if (!result) throw new Error("Draft the RFQ first.");
+      const chosen = manufacturers.filter((m) => sentTo.includes(m.id));
+      // Record first: if the text names the client or the project the database
+      // refuses it, and nothing is marked sent.
+      await recordRfqsSent({
+        packageId,
+        projectId,
+        supplierIds: chosen.map((m) => m.supplier_id),
+        reference: result.reference,
+        english,
+        chinese: chinese || null,
+        schedule: result.schedule,
+      });
+      for (const m of chosen) await setManufacturerStatus(m.id, "rfq_sent");
     },
     onSuccess: () => {
-      toast.success(`Marked ${sentTo.length} manufacturer(s) as "RFQ sent".`);
+      toast.success(
+        `RFQ recorded for ${sentTo.length} manufacturer(s). Factories with a login now see it in their workspace.`,
+      );
       onStatusChanged();
     },
-    onError: (e: unknown) =>
-      toast.error(e instanceof Error ? e.message : "Could not update the status."),
+    onError: (e: unknown) => {
+      const message =
+        e && typeof e === "object" && "message" in e ? String((e as { message: unknown }).message) : "";
+      toast.error(message || "Could not record the RFQ.");
+    },
   });
 
   async function copy(text: string, label: string) {

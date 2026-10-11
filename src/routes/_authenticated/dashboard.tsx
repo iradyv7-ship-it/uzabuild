@@ -26,10 +26,11 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
  * order — returning early above a hook crashed the page once roles arrived.
  */
 function Dashboard() {
-  const { roles, isCostBlind, loading, rolesLoading } = useAuth();
+  const { roles, isCostBlind, isManufacturer, loading, rolesLoading } = useAuth();
   // Roles load after the session: render nothing rather than flash the staff
   // dashboard at a client or a manufacturer.
   if (loading || rolesLoading) return null;
+  if (isManufacturer) return <Navigate to="/supplier" replace />;
   if (isCostBlind) return <Navigate to="/portal" replace />;
   // Cecilia's dedicated workspace (task 3): china_sourcing lands on the
   // sourcing desk instead of the general dashboard, same redirect pattern as

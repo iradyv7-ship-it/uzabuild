@@ -113,10 +113,20 @@ Documented in README.
 - [x] Manufacturer RFQ per package: "Draft RFQ (EN + 中文)" builds the spec, quantity schedule from the BOQ and category-specific questions (tiles, lighting, aluminium…), with client, project, budget and price removed; copy + mark sent.
 
 ### Still open from the audit
-- [ ] Manufacturer workspace (/supplier): invited factories have no page of their own and cannot download RFQ files.
-- [ ] Factory quotes from PDF/Excel/photo (today paste-only), stored per supplier + package, compared side by side.
 - [ ] Notifications (email/WhatsApp) on client uploads, status changes, RFQ replies.
 - [ ] BOQ versioning (pin rates per issued version), integer minor-unit money columns, FX on mixed-currency BOQ lines, BOQ PDF.
 - [ ] Interface translation (French, Kinyarwanda, Chinese); mobile navigation.
 - [ ] Large drawing sets: page splitting + background reading instead of one request.
 - [ ] Review existing user_roles in production for staff seats created through the old sign-up hole.
+
+## Factory workspace, quote comparison, confidentiality walls (11 Oct 2026)
+- [x] /supplier workspace for factories (EN + 中文): their RFQs, released files, submit a quote (PDF/Excel/CSV/Word/photo), correct the read lines, withdraw, message UZA with stored translations.
+- [x] Quotes read by AI into lines matched to the RFQ schedule; Chinese originals kept; never invents prices or quantities.
+- [x] Staff: "Factory quotes · 报价对比" per package — side-by-side matrix in USD at the 6 RMB/USD basis, missing items and quantity mismatches flagged, coverage, lead time; review/shortlist/select/reject; quotes received by email can be entered; start a client proforma from the selected quote.
+- [x] Every RFQ sent is recorded with its exact text and schedule (package_rfqs).
+- [x] Walls, enforced in the database and tested (migration 20261011090000):
+  - factories: no package title, budget, client, project name/location, internal notes or checklist; nothing until an RFQ is sent; only files a person released; never another factory's quote, files or messages;
+  - anything UZA sends a factory (RFQs, messages, translations) is refused if it names the client, contact, project or site;
+  - anything UZA writes for a client (design-board answers, progress updates, showcase products) is refused if it names a factory; proformas already were;
+  - business settings (wastage, coverage, solar factors) were readable by every account incl. clients and factories — staff only now; client menu no longer links to Settings.
+- [ ] Staff-only notes on a quote (today a factory can read its own quote's notes field).

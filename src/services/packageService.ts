@@ -54,6 +54,10 @@ export type PackageAttachment = {
   size_bytes: number | null;
   caption: string | null;
   created_at: string;
+  /** Set when a factory uploaded it: visible to UZA and that factory only. */
+  uploaded_for_supplier_id: string | null;
+  /** A general file reaches the factories only once a person releases it. */
+  shared_with_manufacturers: boolean;
 };
 
 export type PackageManufacturer = {
@@ -174,7 +178,9 @@ export async function updateRequirement(
 export async function listAttachments(projectId: string): Promise<PackageAttachment[]> {
   const { data, error } = await supabase
     .from("package_attachments")
-    .select("id, package_id, requirement_key, kind, file_name, storage_path, mime_type, size_bytes, caption, created_at")
+    .select(
+      "id, package_id, requirement_key, kind, file_name, storage_path, mime_type, size_bytes, caption, created_at, uploaded_for_supplier_id, shared_with_manufacturers",
+    )
     .eq("project_id", projectId)
     .order("created_at", { ascending: false });
   if (error) throw error;
@@ -214,6 +220,44 @@ export async function signedFileUrl(path: string) {
   const { data, error } = await supabase.storage.from("drawings").createSignedUrl(path, 60);
   if (error) throw error;
   return data.signedUrl;
+}
+
+/** Release a checked file to (or withdraw it from) the factories on its package. */
+export async function setAttachmentShared(id: string, shared: boolean) {
+  const { error } = await supabase
+    .from("package_attachments")
+    .update({ shared_with_manufacturers: shared })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+/**
+ * Records exactly what each factory was sent. The database refuses a text that
+ * names the client, the project or its site (assert_factory_safe), and only
+ * after this record exists can the factory see the package and quote on it.
+ */
+export async function recordRfqsSent(input: {
+  packageId: string;
+  projectId: string;
+  supplierIds: string[];
+  reference: string;
+  english: string;
+  chinese: string | null;
+  schedule: { item: string; description: string; unit: string; quantity: number }[];
+}) {
+  if (input.supplierIds.length === 0) return;
+  const { error } = await supabase.from("package_rfqs").insert(
+    input.supplierIds.map((supplierId) => ({
+      package_id: input.packageId,
+      project_id: input.projectId,
+      supplier_id: supplierId,
+      reference: input.reference,
+      english: input.english,
+      chinese: input.chinese || null,
+      schedule: input.schedule,
+    })),
+  );
+  if (error) throw error;
 }
 
 export async function deleteAttachment(id: string) {

@@ -24,6 +24,11 @@ type AuthValue = {
   hasRole: (role: AppRole) => boolean;
   /** Clients never see cost build-up, margin or the catalog cost base. */
   isCostBlind: boolean;
+  /**
+   * A factory account: holds 'manufacturer' and no internal seat. It only ever
+   * sees its own supplier workspace (/supplier).
+   */
+  isManufacturer: boolean;
   signOut: () => Promise<void>;
 };
 
@@ -76,6 +81,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     rolesLoading: Boolean(userId) && rolesFor !== userId,
     hasRole: (role) => roles.includes(role),
     isCostBlind: roles.length > 0 && roles.every((r) => r === "client"),
+    isManufacturer:
+      roles.includes("manufacturer") && roles.every((r) => r === "manufacturer" || r === "client"),
     signOut: signOutRequest,
   };
 

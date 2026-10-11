@@ -1,7 +1,21 @@
 import { Link, Navigate, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { LayoutDashboard, Package, FolderKanban, SlidersHorizontal, LogOut, HardHat, Brain, Building2, LifeBuoy, Factory, ClipboardList, Images } from "lucide-react";
+import {
+  LayoutDashboard,
+  Package,
+  FolderKanban,
+  SlidersHorizontal,
+  LogOut,
+  HardHat,
+  Brain,
+  Building2,
+  LifeBuoy,
+  Factory,
+  ClipboardList,
+  Images,
+  Inbox,
+} from "lucide-react";
 import { useEffect, type ReactNode } from "react";
 import { acceptMyInvitations } from "@/lib/invitations.functions";
 import { Button } from "@/components/ui/button";
@@ -10,10 +24,16 @@ import { ROLE_LABELS, useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
 
 /** Clients see only their own portal — never the catalog, cost base or team screens. */
-const CLIENT_NAV = [
-  { to: "/portal", label: "My projects", icon: LifeBuoy },
-  { to: "/settings", label: "Settings", icon: SlidersHorizontal },
-];
+// No Settings for clients: /settings holds UZA's internal business assumptions
+// (wastage, coverage, solar factors). The shell guard below keeps a client on
+// these routes only.
+const CLIENT_NAV = [{ to: "/portal", label: "My projects", icon: LifeBuoy }];
+
+/**
+ * A factory sees only its own requests for quotation — never projects, clients
+ * or prices. Not even Settings: that page shows UZA's business assumptions.
+ */
+const SUPPLIER_NAV = [{ to: "/supplier", label: "Workspace · 工作台", icon: Inbox }];
 
 const NAV = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -28,9 +48,10 @@ const NAV = [
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { fullName, roles, user, signOut, isCostBlind, rolesLoading } = useAuth();
+  const { fullName, roles, user, signOut, isCostBlind, isManufacturer, rolesLoading } = useAuth();
   // No menu until we know the seat — otherwise a client briefly sees the staff app.
-  const nav = rolesLoading ? [] : isCostBlind ? CLIENT_NAV : NAV;
+  const nav = rolesLoading ? [] : isManufacturer ? SUPPLIER_NAV : isCostBlind ? CLIENT_NAV : NAV;
+  const home = isManufacturer ? "/supplier" : isCostBlind ? "/portal" : "/dashboard";
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -58,13 +79,20 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   // A client seat only ever lands on its portal. The database already refuses
   // cost data to clients; this keeps them from even seeing the internal shells.
-  const clientAllowed = CLIENT_NAV.some((n) => pathname === n.to || pathname.startsWith(`${n.to}/`));
+  const clientAllowed = CLIENT_NAV.some(
+    (n) => pathname === n.to || pathname.startsWith(`${n.to}/`),
+  );
   if (isCostBlind && !clientAllowed) return <Navigate to="/portal" replace />;
+  // Same rule for a factory: its workspace and settings, nothing else.
+  const supplierAllowed = SUPPLIER_NAV.some(
+    (n) => pathname === n.to || pathname.startsWith(`${n.to}/`),
+  );
+  if (isManufacturer && !supplierAllowed) return <Navigate to="/supplier" replace />;
 
   return (
     <div className="flex min-h-screen bg-background">
       <aside className="hidden w-64 shrink-0 flex-col bg-sidebar px-4 py-6 text-sidebar-foreground md:flex">
-        <Link to={isCostBlind ? "/portal" : "/dashboard"} className="mb-8 flex items-center gap-2 px-2">
+        <Link to={home} className="mb-8 flex items-center gap-2 px-2">
           <HardHat className="size-6 text-sidebar-primary" />
           <span className="font-display text-lg font-semibold tracking-tight">UZA Build</span>
         </Link>
@@ -75,7 +103,8 @@ export function AppShell({ children }: { children: ReactNode }) {
               to={to}
               className={cn(
                 "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors hover:bg-sidebar-accent",
-                pathname.startsWith(to) && "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
+                pathname.startsWith(to) &&
+                  "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
               )}
             >
               <Icon className="size-4" />
@@ -95,14 +124,19 @@ export function AppShell({ children }: { children: ReactNode }) {
               ))}
             </div>
           </div>
-          <Button variant="ghost" size="sm" className="w-full justify-start hover:bg-sidebar-accent" onClick={handleSignOut}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start hover:bg-sidebar-accent"
+            onClick={handleSignOut}
+          >
             <LogOut className="size-4" /> Sign out
           </Button>
         </div>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center justify-between border-b bg-card px-4 py-3 md:hidden">
-          <Link to="/dashboard" className="flex items-center gap-2 font-display font-semibold">
+          <Link to={home} className="flex items-center gap-2 font-display font-semibold">
             <HardHat className="size-5" /> UZA Build
           </Link>
           <Button variant="ghost" size="sm" onClick={handleSignOut}>
@@ -111,7 +145,11 @@ export function AppShell({ children }: { children: ReactNode }) {
         </header>
         <nav className="flex gap-1 overflow-x-auto border-b bg-card px-2 py-2 md:hidden">
           {nav.map(({ to, label }) => (
-            <Link key={to} to={to} className="whitespace-nowrap rounded-md px-3 py-1.5 text-sm hover:bg-muted">
+            <Link
+              key={to}
+              to={to}
+              className="whitespace-nowrap rounded-md px-3 py-1.5 text-sm hover:bg-muted"
+            >
               {label}
             </Link>
           ))}

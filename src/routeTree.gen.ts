@@ -23,6 +23,7 @@ import { Route as AuthenticatedPortfolioAdminRouteImport } from './routes/_authe
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedSourcingRouteImport } from './routes/_authenticated/sourcing'
 import { Route as AuthenticatedSourcingDeskRouteImport } from './routes/_authenticated/sourcing-desk'
+import { Route as AuthenticatedSupplierRouteImport } from './routes/_authenticated/supplier'
 import { Route as AuthResetRouteImport } from './routes/auth.reset'
 import { Route as PortfolioIndexRouteImport } from './routes/portfolio.index'
 import { Route as PortfolioSlugRouteImport } from './routes/portfolio.$slug'
@@ -103,6 +104,11 @@ const AuthenticatedSourcingDeskRoute =
     path: '/sourcing-desk',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedSupplierRoute = AuthenticatedSupplierRouteImport.update({
+  id: '/supplier',
+  path: '/supplier',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthResetRoute = AuthResetRouteImport.update({
   id: '/reset',
   path: '/reset',
@@ -157,6 +163,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRoute
   '/sourcing': typeof AuthenticatedSourcingRoute
   '/sourcing-desk': typeof AuthenticatedSourcingDeskRoute
+  '/supplier': typeof AuthenticatedSupplierRoute
   '/auth/reset': typeof AuthResetRoute
   '/portfolio/$slug': typeof PortfolioSlugRoute
   '/portfolio/': typeof PortfolioIndexRoute
@@ -179,6 +186,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AuthenticatedSettingsRoute
   '/sourcing': typeof AuthenticatedSourcingRoute
   '/sourcing-desk': typeof AuthenticatedSourcingDeskRoute
+  '/supplier': typeof AuthenticatedSupplierRoute
   '/auth/reset': typeof AuthResetRoute
   '/portfolio/$slug': typeof PortfolioSlugRoute
   '/portfolio': typeof PortfolioIndexRoute
@@ -203,6 +211,7 @@ export interface FileRoutesById {
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/sourcing': typeof AuthenticatedSourcingRoute
   '/_authenticated/sourcing-desk': typeof AuthenticatedSourcingDeskRoute
+  '/_authenticated/supplier': typeof AuthenticatedSupplierRoute
   '/auth/reset': typeof AuthResetRoute
   '/portfolio/$slug': typeof PortfolioSlugRoute
   '/portfolio/': typeof PortfolioIndexRoute
@@ -227,6 +236,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/sourcing'
     | '/sourcing-desk'
+    | '/supplier'
     | '/auth/reset'
     | '/portfolio/$slug'
     | '/portfolio/'
@@ -249,6 +259,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/sourcing'
     | '/sourcing-desk'
+    | '/supplier'
     | '/auth/reset'
     | '/portfolio/$slug'
     | '/portfolio'
@@ -272,6 +283,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings'
     | '/_authenticated/sourcing'
     | '/_authenticated/sourcing-desk'
+    | '/_authenticated/supplier'
     | '/auth/reset'
     | '/portfolio/$slug'
     | '/portfolio/'
@@ -391,6 +403,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSourcingDeskRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/supplier': {
+      id: '/_authenticated/supplier'
+      path: '/supplier'
+      fullPath: '/supplier'
+      preLoaderRoute: typeof AuthenticatedSupplierRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/auth/reset': {
       id: '/auth/reset'
       path: '/reset'
@@ -453,6 +472,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedSourcingRoute: typeof AuthenticatedSourcingRoute
   AuthenticatedSourcingDeskRoute: typeof AuthenticatedSourcingDeskRoute
+  AuthenticatedSupplierRoute: typeof AuthenticatedSupplierRoute
   AuthenticatedPortalProjectIdRoute: typeof AuthenticatedPortalProjectIdRoute
   AuthenticatedProjectsProjectIdRoute: typeof AuthenticatedProjectsProjectIdRoute
   AuthenticatedPortalIndexRoute: typeof AuthenticatedPortalIndexRoute
@@ -469,6 +489,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedSourcingRoute: AuthenticatedSourcingRoute,
   AuthenticatedSourcingDeskRoute: AuthenticatedSourcingDeskRoute,
+  AuthenticatedSupplierRoute: AuthenticatedSupplierRoute,
   AuthenticatedPortalProjectIdRoute: AuthenticatedPortalProjectIdRoute,
   AuthenticatedProjectsProjectIdRoute: AuthenticatedProjectsProjectIdRoute,
   AuthenticatedPortalIndexRoute: AuthenticatedPortalIndexRoute,

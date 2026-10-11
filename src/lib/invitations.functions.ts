@@ -240,7 +240,7 @@ export const inviteManufacturer = createServerFn({ method: "POST" })
 
     const { data: pkg, error: pkgError } = await context.supabase
       .from("product_packages")
-      .select("id, project_id, title")
+      .select("id, project_id, package_code")
       .eq("id", data.packageId)
       .maybeSingle();
     if (pkgError) throw new Error(pkgError.message);
@@ -281,7 +281,9 @@ export const inviteManufacturer = createServerFn({ method: "POST" })
       const { data: invited, error: inviteError } =
         await supabaseAdmin.auth.admin.inviteUserByEmail(data.email, {
           redirectTo: data.redirectTo,
-          data: { role: "manufacturer", invited_to_package: pkg.title },
+          // The package code only: user metadata is readable by the invited
+          // factory, and a package title can name the client's project.
+          data: { role: "manufacturer", invited_to_package: pkg.package_code ?? "UZA package" },
         });
       if (inviteError || !invited?.user) {
         note = `We recorded the invitation but could not send the email: ${inviteError?.message ?? "unknown error"}.`;

@@ -931,6 +931,310 @@ export type Database = {
           },
         ]
       }
+      factory_quote_lines: {
+        Row: {
+          created_at: string
+          currency: Database["public"]["Enums"]["currency_code"]
+          description: string
+          id: string
+          line_no: number
+          package_id: string
+          quantity: number | null
+          quote_id: string
+          schedule_key: string | null
+          source_ref: string | null
+          specification: string | null
+          unit: string | null
+          unit_price_minor: number | null
+        }
+        Insert: {
+          created_at?: string
+          currency?: Database["public"]["Enums"]["currency_code"]
+          description: string
+          id?: string
+          line_no?: number
+          package_id: string
+          quantity?: number | null
+          quote_id: string
+          schedule_key?: string | null
+          source_ref?: string | null
+          specification?: string | null
+          unit?: string | null
+          unit_price_minor?: number | null
+        }
+        Update: {
+          created_at?: string
+          currency?: Database["public"]["Enums"]["currency_code"]
+          description?: string
+          id?: string
+          line_no?: number
+          package_id?: string
+          quantity?: number | null
+          quote_id?: string
+          schedule_key?: string | null
+          source_ref?: string | null
+          specification?: string | null
+          unit?: string | null
+          unit_price_minor?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "factory_quote_lines_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "factory_quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "factory_quote_lines_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "product_packages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      factory_quotes: {
+        Row: {
+          attachment_path: string | null
+          created_at: string
+          currency: Database["public"]["Enums"]["currency_code"]
+          decided_at: string | null
+          decided_by: string | null
+          file_name: string | null
+          id: string
+          incoterm: string | null
+          lead_time_days: number | null
+          moq_note: string | null
+          notes: string | null
+          package_id: string
+          parse_warnings: Json
+          parsed_at: string | null
+          payment_terms: string | null
+          project_id: string
+          rfq_id: string | null
+          sample_available: boolean | null
+          status: string
+          submitted_by: string | null
+          submitted_side: string
+          supplier_id: string
+          total_minor: number | null
+          updated_at: string
+          valid_until: string | null
+        }
+        Insert: {
+          attachment_path?: string | null
+          created_at?: string
+          currency?: Database["public"]["Enums"]["currency_code"]
+          decided_at?: string | null
+          decided_by?: string | null
+          file_name?: string | null
+          id?: string
+          incoterm?: string | null
+          lead_time_days?: number | null
+          moq_note?: string | null
+          notes?: string | null
+          package_id: string
+          parse_warnings?: Json
+          parsed_at?: string | null
+          payment_terms?: string | null
+          project_id: string
+          rfq_id?: string | null
+          sample_available?: boolean | null
+          status?: string
+          submitted_by?: string | null
+          submitted_side?: string
+          supplier_id: string
+          total_minor?: number | null
+          updated_at?: string
+          valid_until?: string | null
+        }
+        Update: {
+          attachment_path?: string | null
+          created_at?: string
+          currency?: Database["public"]["Enums"]["currency_code"]
+          decided_at?: string | null
+          decided_by?: string | null
+          file_name?: string | null
+          id?: string
+          incoterm?: string | null
+          lead_time_days?: number | null
+          moq_note?: string | null
+          notes?: string | null
+          package_id?: string
+          parse_warnings?: Json
+          parsed_at?: string | null
+          payment_terms?: string | null
+          project_id?: string
+          rfq_id?: string | null
+          sample_available?: boolean | null
+          status?: string
+          submitted_by?: string | null
+          submitted_side?: string
+          supplier_id?: string
+          total_minor?: number | null
+          updated_at?: string
+          valid_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "factory_quotes_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "product_packages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "factory_quotes_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "factory_quotes_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "factory_quotes_rfq_id_fkey"
+            columns: ["rfq_id"]
+            isOneToOne: false
+            referencedRelation: "package_rfqs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      package_rfqs: {
+        Row: {
+          chinese: string | null
+          english: string
+          id: string
+          package_id: string
+          project_id: string
+          reference: string
+          schedule: Json
+          sent_at: string
+          sent_by: string | null
+          sent_by_name: string | null
+          supplier_id: string
+        }
+        Insert: {
+          chinese?: string | null
+          english: string
+          id?: string
+          package_id: string
+          project_id: string
+          reference: string
+          schedule?: Json
+          sent_at?: string
+          sent_by?: string | null
+          sent_by_name?: string | null
+          supplier_id: string
+        }
+        Update: {
+          chinese?: string | null
+          english?: string
+          id?: string
+          package_id?: string
+          project_id?: string
+          reference?: string
+          schedule?: Json
+          sent_at?: string
+          sent_by?: string | null
+          sent_by_name?: string | null
+          supplier_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "package_rfqs_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "product_packages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "package_rfqs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "package_rfqs_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_messages: {
+        Row: {
+          author_id: string | null
+          author_name: string | null
+          author_side: string
+          body: string
+          created_at: string
+          id: string
+          package_id: string
+          project_id: string
+          supplier_id: string
+          translated_body: string | null
+          translated_lang: string | null
+        }
+        Insert: {
+          author_id?: string | null
+          author_name?: string | null
+          author_side: string
+          body: string
+          created_at?: string
+          id?: string
+          package_id: string
+          project_id: string
+          supplier_id: string
+          translated_body?: string | null
+          translated_lang?: string | null
+        }
+        Update: {
+          author_id?: string | null
+          author_name?: string | null
+          author_side?: string
+          body?: string
+          created_at?: string
+          id?: string
+          package_id?: string
+          project_id?: string
+          supplier_id?: string
+          translated_body?: string | null
+          translated_lang?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_messages_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "product_packages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_messages_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_messages_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       drawing_speckle_models: {
         Row: {
           created_at: string
@@ -1290,6 +1594,9 @@ export type Database = {
       }
       package_attachments: {
         Row: {
+          shared_at: string | null
+          shared_by: string | null
+          shared_with_manufacturers: boolean
           caption: string | null
           created_at: string
           file_name: string
@@ -1305,6 +1612,9 @@ export type Database = {
           uploaded_for_supplier_id: string | null
         }
         Insert: {
+          shared_at?: string | null
+          shared_by?: string | null
+          shared_with_manufacturers?: boolean
           caption?: string | null
           created_at?: string
           file_name: string
@@ -1320,6 +1630,9 @@ export type Database = {
           uploaded_for_supplier_id?: string | null
         }
         Update: {
+          shared_at?: string | null
+          shared_by?: string | null
+          shared_with_manufacturers?: boolean
           caption?: string | null
           created_at?: string
           file_name?: string
@@ -3222,6 +3535,27 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      supplier_me: {
+        Args: never
+        Returns: { supplier_id: string; supplier_name: string }[]
+      }
+      supplier_packages: {
+        Args: never
+        Returns: {
+          category: string
+          package_code: string | null
+          package_id: string
+          project_id: string
+          quality_tier: string
+          required_delivery_date: string | null
+          rfq_chinese: string | null
+          rfq_english: string
+          rfq_id: string
+          rfq_reference: string
+          rfq_sent_at: string
+          shortlist_status: string
+        }[]
+      }
       can_read_drawing: {
         Args: { _drawing_id: string; _user_id: string }
         Returns: boolean
